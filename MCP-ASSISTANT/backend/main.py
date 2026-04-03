@@ -24,10 +24,15 @@ load_dotenv()
 
 app = FastAPI()
 
-# Enable CORS for http://localhost:5173
+# Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "https://work-mind-ai.vercel.app",
+        "https://*.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
