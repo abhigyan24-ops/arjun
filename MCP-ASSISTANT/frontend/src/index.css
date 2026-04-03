@@ -1,0 +1,100 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #080810;
+  --surface: #0d0d1a;
+  --surface2: #12121f;
+  --border: #1a1a2e;
+  --border2: #242438;
+  --cyan: #00d4ff;
+  --purple: #7928ca;
+  --text: #e2e8f0;
+  --text2: #64748b;
+  --success: #00ff88;
+  --warning: #ffaa00;
+  --danger: #ff4444;
+}
+
+body {
+  background: transparent;
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.5);
+}
+
+.liquid-glass {
+  background: rgba(8, 8, 16, 0.6) !important;
+  backdrop-filter: blur(2px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(2px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  transition: all 300ms ease !important;
+}
+
+.liquid-glass:hover {
+  border-color: rgba(255,255,255,0.15) !important;
+  box-shadow: 0 0 20px rgba(0,212,255,0.1), 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  transform: translateY(-2px) !important;
+  background: rgba(8,8,16,0.7) !important;
+}
+
+.glow-text-title {
+  color: white !important;
+  text-shadow: 0 0 20px rgba(255,255,255,0.8), 0 0 40px rgba(255,255,255,0.4) !important;
+}
+
+a { text-decoration: none; color: inherit; }
+button { cursor: pointer; font-family: inherit; }
+input, textarea, select { font-family: inherit; }
+
+/* Pulsing dot animation */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.4); }
+  50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(0, 255, 136, 0); }
+}
+
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+.sidebar-glass {
+  background: rgba(0,0,0,0.4) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border-right: 1px solid rgba(255,255,255,0.06) !important;
+  z-index: 50;
+  transition: all 300ms ease;
+}
