@@ -101,7 +101,7 @@ def get_channels(user_email=None):
         print(f"Error fetching channels: {e}")
         return []
 
-def get_channel_messages(channel_id, limit=10, user_email=None):
+def get_channel_messages(channel_id, limit=20, user_email=None):
     try:
         headers = _get_headers(user_email)
         if not headers:
@@ -117,10 +117,6 @@ def get_channel_messages(channel_id, limit=10, user_email=None):
 
         raw_messages = data.get("messages", [])
 
-        # Resolve user IDs → display names
-        user_ids = [msg.get("user", "") for msg in raw_messages]
-        user_map = resolve_usernames(user_ids, headers)
-
         messages = []
         for msg in raw_messages:
             ts_str = msg.get("ts", "")
@@ -133,7 +129,6 @@ def get_channel_messages(channel_id, limit=10, user_email=None):
             messages.append({
                 "text": msg.get("text", ""),
                 "user": uid,
-                "username": user_map.get(uid, uid),
                 "time": time_str,
                 "timestamp": ts_str
             })
@@ -149,16 +144,52 @@ def get_all_unread_messages(user_email=None):
         for channel in channels:
             channel_id = channel["id"]
             channel_name = channel["name"]
-            messages = get_channel_messages(channel_id, limit=5, user_email=user_email)
+            messages = get_channel_messages(channel_id, limit=20, user_email=user_email)
             for msg in messages:
                 all_messages.append({
                     "channel": channel_id,
                     "channel_name": channel_name,
                     "text": msg["text"],
                     "user": msg["user"],
-                    "username": msg.get("username", msg["user"]),
-                    "time": msg["time"]
+                    "time": msg["time"],
+                    "timestamp": msg.get("timestamp", "0")
                 })
+        
+        # Sort all messages by timestamp (newest first) and limit to 20 total
+        all_messages.sort(key=lambda x: float(x["timestamp"]), reverse=True)
+        all_messages = all_messages[:20]
+
+        # Collect all unique user IDs from messages
+        unique_user_ids = list(set(msg.get('user', '') for msg in all_messages if msg.get('user')))
+
+        # Batch resolve all users at once
+        user_map = {}
+        headers = _get_headers(user_email)
+        for uid in unique_user_ids:
+            try:
+                user_resp = requests.get(
+                    'https://slack.com/api/users.info',
+                    headers=headers,
+                    params={'user': uid}
+                )
+                user_data = user_resp.json()
+                if user_data.get('ok') and user_data.get('user'):
+                    profile = user_data['user'].get('profile', {})
+                    user_map[uid] = (
+                        profile.get('display_name') or 
+                        profile.get('real_name') or 
+                        user_data['user'].get('name') or 
+                        uid
+                    )
+                else:
+                    user_map[uid] = uid
+            except:
+                user_map[uid] = uid
+
+        # Populate usernames
+        for msg in all_messages:
+            msg['username'] = user_map.get(msg.get('user', ''), msg.get('user', 'Unknown'))
+
         return all_messages
     except Exception as e:
         print(f"Error fetching all unread messages: {e}")

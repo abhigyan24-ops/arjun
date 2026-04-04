@@ -63,7 +63,7 @@ export default function SlackPage({ googleToken, userEmail }) {
         setMessages([])
       } else {
         setNotConnected(false)
-        const msgs = Array.isArray(data.recent_messages) ? data.recent_messages : []
+        const msgs = Array.isArray(data.recent_messages) ? [...data.recent_messages].reverse() : []
         setMessages(msgs)
       }
     } catch (err) {
@@ -98,7 +98,8 @@ export default function SlackPage({ googleToken, userEmail }) {
     }
   }
 
-  async function sendMessage() {
+  async function sendMessage(e) {
+    if (e) e.preventDefault()
     const targetChannel = manualChannel.trim() || channel
     if (!targetChannel || !msgText.trim()) return
     setSending(true)
@@ -109,7 +110,8 @@ export default function SlackPage({ googleToken, userEmail }) {
         user_email: userEmail
       })
       setMsgText('')
-      fetchSlack()
+      setManualChannel('')
+      await fetchSlack()  // just refresh messages, no page reload
     } catch (err) {
       setError('Failed to send message.')
     } finally {
@@ -289,14 +291,14 @@ export default function SlackPage({ googleToken, userEmail }) {
               <div>
                 <label style={labelStyle}>Message</label>
                 <textarea value={msgText} onChange={e => setMsgText(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e) } }}
                   placeholder="Type your message..."
                   rows={4} className="liquid-glass"
                   style={{ ...inputStyle, resize: 'none', lineHeight: 1.6 }} />
               </div>
 
               {/* Send button */}
-              <motion.button whileTap={{ scale: 0.97 }} onClick={sendMessage}
+              <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={sendMessage}
                 disabled={sending || (!channel && !manualChannel) || !msgText.trim()}
                 style={{
                   width: '100%', padding: 12, borderRadius: 8, border: 'none',
