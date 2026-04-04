@@ -72,7 +72,7 @@ class MeetingPrepRequest(BaseModel):
     meeting: dict
     emails: list = []
     slack_messages: list = []
-    user_email: Optional[str] = None
+    user_email: str = ""
 
 class GithubRequest(BaseModel):
     user_email: Optional[str] = None
