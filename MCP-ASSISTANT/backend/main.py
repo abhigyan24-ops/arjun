@@ -241,7 +241,7 @@ def smart_draft_email(request: EmailDraftRequest):
     try:
         draft = draft_email_reply(request.email, request.instruction)
         if request.user_email:
-            supabase_service.save_draft_email(request.user_email, request.email, draft)
+            supabase_service.save_draft_email(request.user_email, request.email, draft, draft)
         return {"draft": draft}
     except Exception as e:
         import traceback
