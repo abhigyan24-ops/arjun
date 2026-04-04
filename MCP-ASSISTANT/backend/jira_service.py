@@ -37,7 +37,17 @@ def _get_jira_config(user_email):
             "headers": headers
         }
     else:
-        # Fallback to .env mode
+        # If user_email is present, we should NOT fall back to global .env
+        # Only fall back if user_email is None or empty (legacy/shared call)
+        if user_email:
+            return {
+                "base_url": "",
+                "domain": None,
+                "auth": None,
+                "headers": {"Accept": "application/json", "Content-Type": "application/json"}
+            }
+            
+        # Fallback to .env mode for legacy/unauthenticated calls
         return {
             "base_url": f"https://{jira_domain}/rest/api/2" if jira_domain else "",
             "domain": jira_domain,

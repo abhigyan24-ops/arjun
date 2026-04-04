@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import axios from 'axios'
-import { GitPullRequest, GitCommitHorizontal, ExternalLink, Copy, Check } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { GitPullRequest, GitCommitHorizontal, ExternalLink, Copy, Check, Unplug } from 'lucide-react'
 import GlowCard from '../components/GlowCard'
 import StatusBadge from '../components/StatusBadge'
 
 export default function GitHubPage({ user, github, token, userEmail }) {
+  const navigate = useNavigate()
   const [copied, setCopied] = useState(false)
   const [localGithub, setLocalGithub] = useState(github)
 
@@ -14,11 +13,7 @@ export default function GitHubPage({ user, github, token, userEmail }) {
     const fetchGithub = async () => {
       try {
         const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/github`, { user_email: userEmail });
-        setLocalGithub({
-          prs: res.data.prs || [],
-          issues: res.data.issues || [],
-          standup: res.data.standup || ''
-        });
+        setLocalGithub(res.data);
       } catch (e) {
         console.error(e);
       }
@@ -34,6 +29,51 @@ export default function GitHubPage({ user, github, token, userEmail }) {
     navigator.clipboard.writeText(standup)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  if (localGithub?.not_connected) {
+    return (
+      <div style={{ 
+        display: 'flex', alignItems: 'center', justifyContent: 'center', 
+        minHeight: '70vh', padding: 24 
+      }}>
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+          <GlowCard>
+            <div style={{ padding: '40px 60px', textAlign: 'center', maxWidth: 400 }}>
+              <div style={{ 
+                width: 64, height: 64, borderRadius: '50%', background: 'rgba(0,212,255,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px',
+                color: 'var(--cyan)', border: '1px solid rgba(0,212,255,0.2)'
+              }}>
+                <Unplug size={32} />
+              </div>
+              <h2 style={{ fontSize: 24, fontWeight: 700, color: '#fff', marginBottom: 12 }}>GitHub Not Connected</h2>
+              <p style={{ color: 'var(--text2)', marginBottom: 32, lineHeight: 1.6 }}>
+                Connect your GitHub account to see your PRs, issues and commits
+              </p>
+              <button 
+                onClick={() => navigate('/connections')}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--cyan)',
+                  color: 'var(--cyan)',
+                  padding: '12px 24px',
+                  borderRadius: 8,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 0 15px rgba(0,212,255,0.1)'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0,212,255,0.05)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(0,212,255,0.2)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.boxShadow = '0 0 15px rgba(0,212,255,0.1)' }}
+              >
+                Go to Connections
+              </button>
+            </div>
+          </GlowCard>
+        </motion.div>
+      </div>
+    )
   }
 
   const stagger = {

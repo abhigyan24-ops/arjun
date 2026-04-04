@@ -38,17 +38,19 @@ function MainApp() {
 
       setBriefing(briefingRes.data)
       setGithub({
-        prs: githubRes.data?.open_prs || [],
-        issues: githubRes.data?.assigned_issues || [],
+        prs: githubRes.data?.prs || [],
+        issues: githubRes.data?.issues || [],
         standup: githubRes.data?.standup || '',
+        not_connected: githubRes.data?.not_connected || false
       })
-      setSlack(slackRes.data?.recent_messages || [])
+      setSlack(slackRes.data?.not_connected ? { not_connected: true, messages: [] } : (slackRes.data || []))
       setJira({
         assigned: jiraRes.data?.assigned || [],
         overdue: jiraRes.data?.overdue || [],
         sprint: jiraRes.data?.sprint || [],
-        total_assigned: jiraRes.data?.summary?.total_assigned || 0,
-        total_overdue: jiraRes.data?.summary?.total_overdue || 0,
+        total_assigned: jiraRes.data?.total_assigned || 0,
+        total_overdue: jiraRes.data?.total_overdue || 0,
+        not_connected: jiraRes.data?.not_connected || false
       })
     } catch (err) {
       console.error('Error fetching dashboard data', err)

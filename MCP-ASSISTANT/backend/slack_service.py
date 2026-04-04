@@ -9,10 +9,19 @@ from oauth_service import get_slack_token
 
 def _get_headers(user_email):
     token = get_slack_token(user_email)
+    if not token:
+        return None
     return {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
+
+def get_slack_data(user_email=None):
+    """Top-level function that returns not_connected if no token found."""
+    headers = _get_headers(user_email)
+    if headers is None and user_email:
+        return {"not_connected": True}
+    return None
 
 def get_channels(user_email=None):
     try:

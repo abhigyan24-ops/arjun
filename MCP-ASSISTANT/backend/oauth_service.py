@@ -57,24 +57,34 @@ def get_user_integrations(user_email):
         return None
 
 def get_github_token(user_email):
-    integration = get_user_integrations(user_email)
-    if integration and integration.get("github_token"):
-        return integration["github_token"]
+    if user_email:
+        integration = get_user_integrations(user_email)
+        if integration and integration.get("github_token"):
+            return integration["github_token"]
+        return None
     return os.getenv("GITHUB_TOKEN")
 
 def get_slack_token(user_email):
-    integration = get_user_integrations(user_email)
-    if integration and integration.get("slack_token"):
-        return integration["slack_token"]
+    if user_email:
+        integration = get_user_integrations(user_email)
+        if integration and integration.get("slack_token"):
+            return integration["slack_token"]
+        return None
     return os.getenv("SLACK_BOT_TOKEN")
 
 def get_jira_credentials(user_email):
-    integration = get_user_integrations(user_email)
-    if integration and integration.get("jira_token"):
+    if user_email:
+        integration = get_user_integrations(user_email)
+        if integration and integration.get("jira_token"):
+            return {
+                "jira_token": integration["jira_token"],
+                "jira_domain": integration.get("jira_domain"),
+                "jira_email": integration.get("jira_email")
+            }
         return {
-            "jira_token": integration["jira_token"],
-            "jira_domain": integration["jira_domain"],
-            "jira_email": integration["jira_email"]
+            "jira_token": None,
+            "jira_domain": None,
+            "jira_email": None
         }
     return {
         "jira_token": None,

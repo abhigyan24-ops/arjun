@@ -9,10 +9,19 @@ from oauth_service import get_github_token
 
 def _get_headers(user_email):
     token = get_github_token(user_email)
+    if not token:
+        return None
     return {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json"
     }
+
+def get_github_data(user_email=None):
+    """Top-level function that returns not_connected if no token found."""
+    headers = _get_headers(user_email)
+    if headers is None and user_email:
+        return {"not_connected": True}
+    return None
 
 def get_github_user(user_email=None):
     try:

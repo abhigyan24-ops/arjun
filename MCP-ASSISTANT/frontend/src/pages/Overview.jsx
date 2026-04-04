@@ -130,12 +130,16 @@ export default function Overview({ user, token, briefing, github, slack, jira })
     visible: (i) => ({ opacity: 1, y: 0, transition: { delay: i * 0.08, duration: 0.4, ease: 'easeOut' } }),
   }
 
-  const prCount = github?.prs?.length || 0
-  const overdueCount = jira?.total_overdue || 0
+  const githubConnected = github && !github.not_connected
+  const jiraConnected = jira && !jira.not_connected
+  const slackConnected = slack && !slack.not_connected
+
+  const prCount = githubConnected ? (github?.prs?.length || 0) : '--'
+  const overdueCount = jiraConnected ? (jira?.total_overdue || 0) : '--'
   const emailCount = briefing?.email_count || 0
   const meetingCount = briefing?.meeting_count || 0
-  const assignedTickets = jira?.total_assigned || 0
-  const recentSlack = (slack || []).slice(0, 3)
+  const assignedTickets = jiraConnected ? (jira?.total_assigned || 0) : '--'
+  const recentSlack = slackConnected ? (Array.isArray(slack) ? slack.slice(0, 3) : []) : []
 
   const getGreeting = () => {
     const h = time.getHours()
@@ -248,7 +252,7 @@ export default function Overview({ user, token, briefing, github, slack, jira })
                   </div>
                 </Link>
               ))}
-              {(jira?.overdue || []).slice(0, 2).map((ticket, i) => (
+              {jiraConnected && (jira?.overdue || []).slice(0, 2).map((ticket, i) => (
                 <a href={ticket.url} target="_blank" rel="noreferrer" key={`jira-${i}`} className="liquid-glass" style={{
                   display: 'flex', alignItems: 'flex-start', gap: 12, padding: 12, borderRadius: 8, transition: 'all 0.2s', marginBottom: 4,
                 }}>
@@ -259,7 +263,7 @@ export default function Overview({ user, token, briefing, github, slack, jira })
                   </div>
                 </a>
               ))}
-              {(github?.prs || []).slice(0, 2).map((pr, i) => (
+              {githubConnected && (github?.prs || []).slice(0, 2).map((pr, i) => (
                 <a href={pr.url || pr.html_url} target="_blank" rel="noreferrer" key={`pr-${i}`} className="liquid-glass" style={{
                   display: 'flex', alignItems: 'flex-start', gap: 12, padding: 12, borderRadius: 8, transition: 'all 0.2s', marginBottom: 4,
                 }}>
@@ -270,7 +274,7 @@ export default function Overview({ user, token, briefing, github, slack, jira })
                   </div>
                 </a>
               ))}
-              {(!briefing?.urgent_emails?.length && !jira?.overdue?.length && !github?.prs?.length) && (
+              {(!briefing?.urgent_emails?.length && (!jiraConnected || !jira?.overdue?.length) && (!githubConnected || !github?.prs?.length)) && (
                 <div style={{ padding: 24, textAlign: 'center', color: 'var(--text2)', fontSize: 12 }}>All clear -- nothing needs attention right now.</div>
               )}
             </div>

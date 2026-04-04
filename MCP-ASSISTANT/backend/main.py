@@ -17,8 +17,8 @@ from googleapiclient.discovery import build
 from gmail_service import fetch_recent_emails
 from calendar_service import fetch_today_events
 from gemini_service import generate_briefing, generate_standup
-from github_service import get_open_prs, get_assigned_issues, get_recent_commits
-from slack_service import get_channels, get_all_unread_messages, send_message
+from github_service import get_open_prs, get_assigned_issues, get_recent_commits, get_github_data
+from slack_service import get_channels, get_all_unread_messages, send_message, get_slack_data
 from jira_service import get_jira_summary
 from smart_actions_service import draft_email_reply, generate_meeting_prep
 
@@ -147,6 +147,10 @@ def fetch_slack_channels(user_email: Optional[str] = None):
 @app.get("/slack/messages")
 def fetch_slack_messages(user_email: Optional[str] = None):
     try:
+        check = get_slack_data(user_email)
+        if check and check.get("not_connected"):
+            return {"not_connected": True, "messages": [], "channels": []}
+
         messages = get_all_unread_messages(user_email)
         if user_email:
             supabase_service.save_slack_history(user_email, "general", messages)
@@ -168,6 +172,11 @@ def post_slack_message(request: SlackSendRequest):
 def get_github_summary(request: GithubRequest = None):
     try:
         user_email = request.user_email if request else None
+
+        check = get_github_data(user_email)
+        if check and check.get("not_connected"):
+            return {"not_connected": True, "prs": [], "issues": [], "commits": [], "standup": ""}
+
         prs = get_open_prs(user_email)
         issues = get_assigned_issues(user_email)
         commits = get_recent_commits(user_email)
@@ -202,6 +211,12 @@ def post_chat(request: ChatRequest):
 @app.get("/jira")
 def get_jira(user_email: Optional[str] = None):
     try:
+        if user_email:
+            from oauth_service import get_jira_credentials
+            creds = get_jira_credentials(user_email)
+            if not creds.get("jira_token") and not creds.get("jira_domain"):
+                return {"not_connected": True, "assigned": [], "sprint": [], "overdue": []}
+
         jira_data = get_jira_summary(user_email)
         if user_email:
             supabase_service.save_jira_history(user_email, jira_data)

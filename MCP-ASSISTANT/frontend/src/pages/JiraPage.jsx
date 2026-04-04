@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import axios from 'axios'
-import { LayoutGrid, Clock, CheckCircle2, AlertTriangle, ExternalLink, Activity } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { LayoutGrid, Clock, CheckCircle2, AlertTriangle, ExternalLink, Activity, Unplug } from 'lucide-react'
 import GlowCard from '../components/GlowCard'
 import StatusBadge from '../components/StatusBadge'
 
 export default function JiraPage({ jira, token, userEmail }) {
+  const navigate = useNavigate()
   const [localJira, setLocalJira] = useState(jira)
 
   useEffect(() => {
@@ -29,6 +28,51 @@ export default function JiraPage({ jira, token, userEmail }) {
   const sprintDone = sprint.filter((t) => t.status?.toLowerCase().includes('done')).length
   const sprintTotal = sprint.length
   const sprintPercent = sprintTotal > 0 ? Math.round((sprintDone / sprintTotal) * 100) : 0
+
+  if (localJira?.not_connected) {
+    return (
+      <div style={{ 
+        display: 'flex', alignItems: 'center', justifyContent: 'center', 
+        minHeight: '70vh', padding: 24 
+      }}>
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+          <GlowCard>
+            <div style={{ padding: '40px 60px', textAlign: 'center', maxWidth: 400 }}>
+              <div style={{ 
+                width: 64, height: 64, borderRadius: '50%', background: 'rgba(255,170,0,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px',
+                color: 'var(--warning)', border: '1px solid rgba(255,170,0,0.2)'
+              }}>
+                <Unplug size={32} />
+              </div>
+              <h2 style={{ fontSize: 24, fontWeight: 700, color: '#fff', marginBottom: 12 }}>Jira Not Connected</h2>
+              <p style={{ color: 'var(--text2)', marginBottom: 32, lineHeight: 1.6 }}>
+                Connect your Jira account to see your tickets and sprints
+              </p>
+              <button 
+                onClick={() => navigate('/connections')}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--cyan)',
+                  color: 'var(--cyan)',
+                  padding: '12px 24px',
+                  borderRadius: 8,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 0 15px rgba(0,212,255,0.1)'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0,212,255,0.05)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(0,212,255,0.2)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.boxShadow = '0 0 15px rgba(0,212,255,0.1)' }}
+              >
+                Go to Connections
+              </button>
+            </div>
+          </GlowCard>
+        </motion.div>
+      </div>
+    )
+  }
 
   const stagger = {
     hidden: { opacity: 0, y: 20 },
