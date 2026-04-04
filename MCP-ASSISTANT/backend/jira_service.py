@@ -9,12 +9,41 @@ from oauth_service import get_jira_credentials
 
 def _get_jira_config(user_email):
     creds = get_jira_credentials(user_email)
-    domain = creds.get("jira_domain")
-    return {
-        "base_url": f"https://{domain}/rest/api/2" if domain else "",
-        "domain": domain,
-        "auth": HTTPBasicAuth(creds.get("jira_email"), creds.get("jira_token"))
-    }
+    jira_token = creds.get("jira_token")
+    jira_domain = creds.get("jira_domain")
+    jira_email = creds.get("jira_email")
+
+    if jira_token:
+        # OAuth mode
+        headers = {
+            "Authorization": f"Bearer {jira_token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        try:
+            resp = requests.get("https://api.atlassian.com/oauth/token/accessible-resources", headers={"Authorization": f"Bearer {jira_token}"})
+            resp.raise_for_status()
+            cloud_id = resp.json()[0]["id"]
+            base_url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3"
+        except Exception as e:
+            print(f"Error fetching Jira cloud_id: {e}")
+            cloud_id = None
+            base_url = ""
+            
+        return {
+            "base_url": base_url,
+            "domain": jira_domain,
+            "auth": None,
+            "headers": headers
+        }
+    else:
+        # Fallback to .env mode
+        return {
+            "base_url": f"https://{jira_domain}/rest/api/2" if jira_domain else "",
+            "domain": jira_domain,
+            "auth": HTTPBasicAuth(jira_email, os.getenv("JIRA_API_TOKEN")),
+            "headers": {"Accept": "application/json", "Content-Type": "application/json"}
+        }
 
 HEADERS = {"Accept": "application/json"}
 
@@ -26,7 +55,7 @@ def get_current_user_account_id(user_email=None):
         response = requests.get(
             f"{config['base_url']}/myself",
             auth=config['auth'],
-            headers=HEADERS
+            headers=config['headers']
         )
         response.raise_for_status()
         return response.json().get("accountId")
@@ -46,7 +75,7 @@ def get_assigned_tickets(user_email=None):
         response = requests.post(
             f"{config['base_url']}/search/jql",
             auth=config['auth'],
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            headers=config['headers'],
             json={
                 "jql": f"assignee={account_id} AND statusCategory != Done ORDER BY priority DESC",
                 "maxResults": 10,
@@ -87,7 +116,7 @@ def get_overdue_tickets(user_email=None):
         response = requests.post(
             f"{config['base_url']}/search/jql",
             auth=config['auth'],
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            headers=config['headers'],
             json={
                 "jql": f"assignee={account_id} AND due <= now() AND statusCategory != Done",
                 "maxResults": 10,
@@ -128,7 +157,7 @@ def get_sprint_tickets(user_email=None):
         response = requests.post(
             f"{config['base_url']}/search/jql",
             auth=config['auth'],
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            headers=config['headers'],
             json={
                 "jql": f"assignee={account_id} AND sprint in openSprints()",
                 "maxResults": 10,

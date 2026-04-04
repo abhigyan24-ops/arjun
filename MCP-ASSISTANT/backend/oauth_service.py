@@ -77,7 +77,7 @@ def get_jira_credentials(user_email):
             "jira_email": integration["jira_email"]
         }
     return {
-        "jira_token": os.getenv("JIRA_API_TOKEN"),
+        "jira_token": None,
         "jira_domain": os.getenv("JIRA_DOMAIN"),
         "jira_email": os.getenv("JIRA_EMAIL")
     }
