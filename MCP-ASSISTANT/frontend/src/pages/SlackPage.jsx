@@ -5,7 +5,8 @@ import GlowCard from '../components/GlowCard'
 import axios from 'axios'
 
 export default function SlackPage({ slack, token, userEmail }) {
-  const [channel, setChannel] = useState('')
+  const [selectedChannel, setSelectedChannel] = useState('')
+  const [channels, setChannels] = useState([])
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [sentHistory, setSentHistory] = useState([])
@@ -15,11 +16,19 @@ export default function SlackPage({ slack, token, userEmail }) {
     if (!userEmail) return;
     const fetchSlack = async () => {
       try {
-        const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/slack/messages?user_email=${userEmail}`);
-        if (res.data?.recent_messages) {
-          setLocalSlack(res.data.recent_messages);
-        } else if (Array.isArray(res.data)) {
-          setLocalSlack(res.data);
+        const [msgRes, channelRes] = await Promise.all([
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/slack/messages?user_email=${userEmail}`),
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/slack/channels`)
+        ]);
+        
+        if (msgRes.data?.recent_messages) {
+          setLocalSlack(msgRes.data.recent_messages);
+        } else if (Array.isArray(msgRes.data)) {
+          setLocalSlack(msgRes.data);
+        }
+        
+        if (Array.isArray(channelRes.data)) {
+          setChannels(channelRes.data);
         }
       } catch (e) {
         console.error(e);
@@ -39,13 +48,14 @@ export default function SlackPage({ slack, token, userEmail }) {
   const channelNames = Object.keys(channelMap)
 
   const handleSend = async () => {
-    if (!channel.trim() || !message.trim()) return
+    if (!selectedChannel.trim() || !message.trim()) return
     setSending(true)
     try {
-      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/slack/send`, { channel, message }, {
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/slack/send`, { channel_id: selectedChannel, message }, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      setSentHistory((prev) => [{ channel, message, time: new Date().toLocaleTimeString() }, ...prev])
+      const channelName = channels.find((c) => c.id === selectedChannel)?.name || selectedChannel
+      setSentHistory((prev) => [{ channel: channelName, message, time: new Date().toLocaleTimeString() }, ...prev])
       setMessage('')
     } catch (_err) {
       console.error('Failed to send message')
@@ -116,7 +126,7 @@ export default function SlackPage({ slack, token, userEmail }) {
               <div>
                 <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Channel</label>
                 <select
-                  value={channel} onChange={(e) => setChannel(e.target.value)}
+                  value={selectedChannel} onChange={(e) => setSelectedChannel(e.target.value)}
                   className="liquid-glass"
                   style={{
                     width: '100%', color: 'var(--text)',
@@ -125,8 +135,8 @@ export default function SlackPage({ slack, token, userEmail }) {
                   }}
                 >
                   <option value="">Select a channel...</option>
-                  {channelNames.map((ch) => (
-                    <option key={ch} value={ch}>#{ch}</option>
+                  {channels.map((ch) => (
+                    <option key={ch.id} value={ch.id}>#{ch.name}</option>
                   ))}
                 </select>
               </div>
@@ -151,12 +161,12 @@ export default function SlackPage({ slack, token, userEmail }) {
               <motion.button
                 whileTap={{ scale: 0.97 }}
                 onClick={handleSend}
-                disabled={sending || !channel || !message.trim()}
+                disabled={sending || !selectedChannel || !message.trim()}
                 style={{
                   width: '100%', padding: 12, borderRadius: 8, border: 'none',
                   background: 'linear-gradient(135deg, #00d4ff, #7928ca)', color: '#fff',
                   fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  opacity: sending || !channel || !message.trim() ? 0.5 : 1,
+                  opacity: sending || !selectedChannel || !message.trim() ? 0.5 : 1,
                   boxShadow: '0 0 20px rgba(0,212,255,0.15)', transition: 'opacity 0.2s',
                 }}
               >
