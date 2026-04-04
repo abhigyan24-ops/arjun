@@ -186,9 +186,11 @@ def get_all_unread_messages(user_email=None):
             except:
                 user_map[uid] = uid
 
-        # Populate usernames
+        # Populate usernames and overwrite 'user' field with real name so briefings show names, not IDs
         for msg in all_messages:
-            msg['username'] = user_map.get(msg.get('user', ''), msg.get('user', 'Unknown'))
+            resolved_name = user_map.get(msg.get('user', ''), msg.get('user', 'Unknown'))
+            msg['username'] = resolved_name
+            msg['user'] = resolved_name  # Replace raw user_id with the real name
 
         return all_messages
     except Exception as e:
