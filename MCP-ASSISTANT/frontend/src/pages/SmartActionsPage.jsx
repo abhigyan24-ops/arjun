@@ -26,7 +26,7 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
     setEmailLoading(true)
     try {
       const email = emails[parseInt(selectedEmail)]
-      const res = await axios.post('http://localhost:8000/smart/draft-email', {
+      const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/smart/draft-email`, {
         email: {
           subject: email.subject,
           sender: email.sender,
@@ -48,7 +48,7 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
     setMeetingLoading(true)
     try {
       const meeting = meetings[parseInt(selectedMeeting)]
-      const res = await axios.post('http://localhost:8000/smart/meeting-prep', {
+      const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/smart/meeting-prep`, {
         meeting: {
           title: meeting.title,
           attendees: meeting.attendees || [],

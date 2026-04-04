@@ -42,7 +42,7 @@ export default function SlackPage({ slack, token, userEmail }) {
     if (!channel.trim() || !message.trim()) return
     setSending(true)
     try {
-      await axios.post('http://localhost:8000/slack/send', { channel, message }, {
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/slack/send`, { channel, message }, {
         headers: { Authorization: `Bearer ${token}` },
       })
       setSentHistory((prev) => [{ channel, message, time: new Date().toLocaleTimeString() }, ...prev])

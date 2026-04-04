@@ -29,10 +29,10 @@ function MainApp() {
     setLoading(true)
     try {
       const [briefingRes, githubRes, slackRes, jiraRes] = await Promise.all([
-        axios.post('http://localhost:8000/briefing', { google_token: accessToken }).catch(() => ({ data: null })),
-        axios.post('http://localhost:8000/github', {}).catch(() => ({ data: null })),
-        axios.get('http://localhost:8000/slack/messages').catch(() => ({ data: null })),
-        axios.get('http://localhost:8000/jira').catch(() => ({ data: null })),
+        axios.post(`${import.meta.env.VITE_BACKEND_URL}/briefing`, { google_token: accessToken }).catch(() => ({ data: null })),
+        axios.post(`${import.meta.env.VITE_BACKEND_URL}/github`, {}).catch(() => ({ data: null })),
+        axios.get(`${import.meta.env.VITE_BACKEND_URL}/slack/messages`).catch(() => ({ data: null })),
+        axios.get(`${import.meta.env.VITE_BACKEND_URL}/jira`).catch(() => ({ data: null })),
       ])
 
       setBriefing(briefingRes.data)
