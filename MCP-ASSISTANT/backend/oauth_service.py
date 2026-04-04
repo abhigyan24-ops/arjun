@@ -91,3 +91,68 @@ def get_jira_credentials(user_email):
         "jira_domain": os.getenv("JIRA_DOMAIN"),
         "jira_email": os.getenv("JIRA_EMAIL")
     }
+
+def refresh_jira_token(user_email):
+    """
+    Uses the stored jira_refresh_token to get a new access token from Atlassian.
+    Saves the new token to Supabase and returns it.
+    Returns None if refresh fails.
+    """
+    import requests
+    import os
+    
+    try:
+        integration = get_user_integrations(user_email)
+        if not integration:
+            print(f"No integration found for {user_email}")
+            return None
+            
+        refresh_token = integration.get('jira_refresh_token')
+        if not refresh_token:
+            print(f"No jira_refresh_token found for {user_email}")
+            return None
+        
+        JIRA_CLIENT_ID = os.getenv('JIRA_CLIENT_ID')
+        JIRA_CLIENT_SECRET = os.getenv('JIRA_CLIENT_SECRET')
+        
+        response = requests.post(
+            'https://auth.atlassian.com/oauth/token',
+            json={
+                'grant_type': 'refresh_token',
+                'client_id': JIRA_CLIENT_ID,
+                'client_secret': JIRA_CLIENT_SECRET,
+                'refresh_token': refresh_token
+            },
+            headers={'Content-Type': 'application/json'}
+        )
+        
+        print(f"Jira token refresh response status: {response.status_code}")
+        print(f"Jira token refresh response: {response.text}")
+        
+        if response.status_code != 200:
+            print(f"Failed to refresh Jira token for {user_email}: {response.text}")
+            return None
+        
+        data = response.json()
+        new_access_token = data.get('access_token')
+        new_refresh_token = data.get('refresh_token', refresh_token)  # Atlassian rotates refresh tokens
+        
+        if not new_access_token:
+            print(f"No access_token in refresh response for {user_email}")
+            return None
+        
+        # Save new tokens to Supabase
+        from datetime import datetime, timezone
+        update_data = {
+            'jira_token': new_access_token,
+            'jira_refresh_token': new_refresh_token,
+            'updated_at': datetime.now(timezone.utc).isoformat()
+        }
+        supabase.table('user_integrations').update(update_data).eq('user_email', user_email).execute()
+        print(f"Jira token refreshed and saved for {user_email}")
+        
+        return new_access_token
+        
+    except Exception as e:
+        print(f"Error refreshing Jira token for {user_email}: {e}")
+        return None

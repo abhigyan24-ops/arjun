@@ -6,6 +6,7 @@ from requests.auth import HTTPBasicAuth
 load_dotenv()
 
 from supabase_service import supabase
+from oauth_service import refresh_jira_token
 
 def get_user_integration(user_email):
     if not user_email:
@@ -18,40 +19,65 @@ def get_user_integration(user_email):
     except:
         return None
 
-def _get_jira_config(user_email):
+def _get_jira_config(user_email, _retry=False):
     if user_email:
         integration = get_user_integration(user_email)
         jira_token = integration.get('jira_token') if integration else None
         jira_domain = integration.get('jira_domain') if integration else None
         jira_email = integration.get('jira_email') if integration else None
     else:
-        jira_token = None
-        jira_domain = None
-        jira_email = None
-
-    if jira_token:
-        # OAuth mode
-        headers = {
-            "Authorization": f"Bearer {jira_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json"
+        return {
+            "base_url": "",
+            "domain": None,
+            "auth": None,
+            "headers": {"Accept": "application/json", "Content-Type": "application/json"}
         }
-        try:
-            resp = requests.get("https://api.atlassian.com/oauth/token/accessible-resources", headers={"Authorization": f"Bearer {jira_token}"})
-            resp.raise_for_status()
-            resources = resp.json()
-            print(f"Jira accessible-resources for {user_email}: {resources}")
-            if not resources:
-                print(f"No Jira resources found for {user_email}")
-                return {"base_url": "", "domain": jira_domain, "auth": None, "headers": headers}
 
-            cloud_id = resources[0]["id"]
-            base_url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3"
-            print(f"Using Jira cloud_id: {cloud_id}, base_url: {base_url}")
-        except Exception as e:
-            print(f"Error fetching Jira cloud_id for {user_email}: {e}")
-            cloud_id = None
-            base_url = ""
+    if not jira_token:
+        print(f"No Jira token found for {user_email} in Supabase.")
+        return {
+            "base_url": "",
+            "domain": None,
+            "auth": None,
+            "headers": {"Accept": "application/json", "Content-Type": "application/json"}
+        }
+
+    headers = {
+        "Authorization": f"Bearer {jira_token}",
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        resp = requests.get(
+            "https://api.atlassian.com/oauth/token/accessible-resources",
+            headers={"Authorization": f"Bearer {jira_token}"}
+        )
+        
+        print(f"Jira accessible-resources status for {user_email}: {resp.status_code}")
+        
+        # Token expired — try to refresh once
+        if resp.status_code == 401 and not _retry:
+            print(f"Jira token expired for {user_email}, attempting refresh...")
+            new_token = refresh_jira_token(user_email)
+            if new_token:
+                print(f"Jira token refreshed successfully for {user_email}, retrying...")
+                return _get_jira_config(user_email, _retry=True)
+            else:
+                print(f"Jira token refresh failed for {user_email}")
+                return {"base_url": "", "domain": jira_domain, "auth": None, "headers": headers}
+        
+        resp.raise_for_status()
+        resources = resp.json()
+        print(f"Jira accessible-resources for {user_email}: {resources}")
+        
+        if not resources:
+            print(f"No Jira resources found for {user_email}")
+            return {"base_url": "", "domain": jira_domain, "auth": None, "headers": headers}
+
+        cloud_id = resources[0]["id"]
+        base_url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3"
+        print(f"Using Jira cloud_id: {cloud_id}, base_url: {base_url}")
 
         return {
             "base_url": base_url,
@@ -59,16 +85,10 @@ def _get_jira_config(user_email):
             "auth": None,
             "headers": headers
         }
-    else:
-        # No token found — user is not connected
-        if user_email:
-            print(f"No Jira token found for {user_email} in Supabase.")
-        return {
-            "base_url": "",
-            "domain": None,
-            "auth": None,
-            "headers": {"Accept": "application/json", "Content-Type": "application/json"}
-        }
+
+    except Exception as e:
+        print(f"Error fetching Jira cloud_id for {user_email}: {e}")
+        return {"base_url": "", "domain": jira_domain, "auth": None, "headers": headers}
 
 HEADERS = {"Accept": "application/json"}
 
