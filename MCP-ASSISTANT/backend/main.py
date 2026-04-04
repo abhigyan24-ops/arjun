@@ -253,7 +253,8 @@ def smart_meeting_prep(request: MeetingPrepRequest):
     try:
         prep = generate_meeting_prep(request.meeting, request.emails, request.slack_messages)
         if request.user_email:
-            supabase_service.save_meeting_prep(request.user_email, request.meeting, prep)
+            meeting_title = request.meeting.get("title", "Untitled Meeting")
+            supabase_service.save_meeting_prep(request.user_email, meeting_title, prep)
         return {"prep": prep}
     except Exception as e:
         import traceback
