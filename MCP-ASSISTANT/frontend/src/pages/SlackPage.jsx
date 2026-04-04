@@ -10,6 +10,7 @@ export default function SlackPage({ slack, token, userEmail }) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [sentHistory, setSentHistory] = useState([])
+  const [loading, setLoading] = useState(true)
   const [localSlack, setLocalSlack] = useState(slack || [])
   const [notConnected, setNotConnected] = useState(false)
 
@@ -17,6 +18,7 @@ export default function SlackPage({ slack, token, userEmail }) {
     if (!userEmail) return;
     const fetchSlack = async () => {
       try {
+        setLoading(true);
         const [msgRes, channelRes] = await Promise.all([
           axios.get(`${import.meta.env.VITE_BACKEND_URL}/slack/messages?user_email=${userEmail}`),
           axios.get(`${import.meta.env.VITE_BACKEND_URL}/slack/channels`)
@@ -38,6 +40,8 @@ export default function SlackPage({ slack, token, userEmail }) {
         }
       } catch (e) {
         console.error(e);
+      } finally {
+        setLoading(false);
       }
     };
     fetchSlack();
@@ -47,9 +51,11 @@ export default function SlackPage({ slack, token, userEmail }) {
 
   // Group messages by channel
   const channelMap = {}
-  messages.forEach((msg) => {
-    if (!channelMap[msg.channel]) channelMap[msg.channel] = []
-    channelMap[msg.channel].push(msg)
+  (localSlack || []).forEach((msg) => {
+    if (msg && msg.channel) {
+      if (!channelMap[msg.channel]) channelMap[msg.channel] = []
+      channelMap[msg.channel].push(msg)
+    }
   })
   const channelNames = Object.keys(channelMap)
 
@@ -70,7 +76,20 @@ export default function SlackPage({ slack, token, userEmail }) {
     }
   }
 
-  if (notConnected) {
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '70vh', gap: 16 }}>
+        <motion.div
+          animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(0,212,255,0.2)', border: '2px solid var(--cyan)' }}
+        />
+        <p style={{ color: 'var(--cyan)', fontWeight: 600, fontSize: 14, letterSpacing: '0.05em' }}>Loading Slack...</p>
+      </div>
+    )
+  }
+
+  if (!loading && notConnected) {
     return (
       <div style={{ 
         display: 'flex', alignItems: 'center', justifyContent: 'center', 
@@ -133,7 +152,7 @@ export default function SlackPage({ slack, token, userEmail }) {
             <MessageSquare size={16} style={{ color: 'var(--cyan)' }} /> Channels
           </h3>
 
-          {channelNames.length > 0 ? channelNames.map((ch, ci) => (
+            {channelNames.length > 0 ? channelNames.map((ch, ci) => (
             <div key={ch} style={{ marginBottom: 20 }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -143,7 +162,7 @@ export default function SlackPage({ slack, token, userEmail }) {
                 <Hash size={14} /> {ch}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {channelMap[ch].map((msg, mi) => (
+                {(channelMap[ch] || []).map((msg, mi) => (
                   <GlowCard key={mi}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                       <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{msg.user}</span>

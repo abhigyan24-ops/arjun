@@ -5,16 +5,20 @@ import StatusBadge from '../components/StatusBadge'
 
 export default function JiraPage({ jira, token, userEmail }) {
   const navigate = useNavigate()
+  const [loading, setLoading] = useState(true)
   const [localJira, setLocalJira] = useState(jira)
 
   useEffect(() => {
     if (!userEmail) return;
     const fetchJira = async () => {
       try {
+        setLoading(true);
         const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/jira?user_email=${userEmail}`);
         if (res.data) setLocalJira(res.data);
       } catch (e) {
         console.error(e);
+      } finally {
+        setLoading(false);
       }
     };
     fetchJira();
@@ -23,13 +27,25 @@ export default function JiraPage({ jira, token, userEmail }) {
   const assigned = localJira?.assigned || []
   const sprint = localJira?.sprint || []
   const overdue = localJira?.overdue || []
-
-  // Calculate sprint progress
-  const sprintDone = sprint.filter((t) => t.status?.toLowerCase().includes('done')).length
-  const sprintTotal = sprint.length
+  
+  const sprintDone = (sprint || []).filter((t) => t && t.status?.toLowerCase().includes('done')).length
+  const sprintTotal = (sprint || []).length
   const sprintPercent = sprintTotal > 0 ? Math.round((sprintDone / sprintTotal) * 100) : 0
 
-  if (localJira?.not_connected) {
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '70vh', gap: 16 }}>
+        <motion.div
+          animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(0,212,255,0.2)', border: '2px solid var(--cyan)' }}
+        />
+        <p style={{ color: 'var(--cyan)', fontWeight: 600, fontSize: 14, letterSpacing: '0.05em' }}>Loading Jira...</p>
+      </div>
+    )
+  }
+
+  if (!loading && localJira?.not_connected) {
     return (
       <div style={{ 
         display: 'flex', alignItems: 'center', justifyContent: 'center', 
@@ -117,9 +133,9 @@ export default function JiraPage({ jira, token, userEmail }) {
             <span style={{
               fontSize: 11, background: 'rgba(0,212,255,0.1)', color: 'var(--cyan)',
               padding: '1px 8px', borderRadius: 9999,
-            }}>{assigned.length}</span>
+            }}>{(assigned || []).length}</span>
           </div>
-          {assigned.length > 0 ? assigned.map((ticket, i) => (
+          {(assigned || []).length > 0 ? (assigned || []).map((ticket, i) => (
             <TicketCard key={i} ticket={ticket} borderColor="var(--border)" />
           )) : (
             <GlowCard>
@@ -153,7 +169,7 @@ export default function JiraPage({ jira, token, userEmail }) {
             </div>
           )}
 
-          {sprint.length > 0 ? sprint.map((ticket, i) => (
+          { (sprint || []).length > 0 ? (sprint || []).map((ticket, i) => (
             <TicketCard key={i} ticket={ticket} borderColor="var(--border)" />
           )) : (
             <GlowCard>
@@ -169,14 +185,14 @@ export default function JiraPage({ jira, token, userEmail }) {
         <motion.div custom={3} initial="hidden" animate="visible" variants={stagger}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <h3 style={{ fontSize: 15, fontWeight: 600 }}>Needs Attention</h3>
-            {overdue.length > 0 && (
+            {(overdue || []).length > 0 && (
               <span style={{
                 fontSize: 11, background: 'rgba(255,68,68,0.1)', color: 'var(--danger)',
                 padding: '1px 8px', borderRadius: 9999, border: '1px solid rgba(255,68,68,0.2)',
-              }}>{overdue.length}</span>
+              }}>{(overdue || []).length}</span>
             )}
           </div>
-          {overdue.length > 0 ? overdue.map((ticket, i) => (
+          {(overdue || []).length > 0 ? (overdue || []).map((ticket, i) => (
             <TicketCard key={i} ticket={ticket} borderColor="var(--danger)" />
           )) : (
             <GlowCard>

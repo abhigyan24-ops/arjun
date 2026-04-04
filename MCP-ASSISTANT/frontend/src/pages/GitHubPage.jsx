@@ -6,16 +6,20 @@ import StatusBadge from '../components/StatusBadge'
 export default function GitHubPage({ user, github, token, userEmail }) {
   const navigate = useNavigate()
   const [copied, setCopied] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [localGithub, setLocalGithub] = useState(github)
 
   useEffect(() => {
     if (!userEmail) return;
     const fetchGithub = async () => {
       try {
+        setLoading(true);
         const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/github`, { user_email: userEmail });
         setLocalGithub(res.data);
       } catch (e) {
         console.error(e);
+      } finally {
+        setLoading(false);
       }
     };
     fetchGithub();
@@ -31,7 +35,20 @@ export default function GitHubPage({ user, github, token, userEmail }) {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  if (localGithub?.not_connected) {
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '70vh', gap: 16 }}>
+        <motion.div
+          animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(0,212,255,0.2)', border: '2px solid var(--cyan)' }}
+        />
+        <p style={{ color: 'var(--cyan)', fontWeight: 600, fontSize: 14, letterSpacing: '0.05em' }}>Loading GitHub...</p>
+      </div>
+    )
+  }
+
+  if (!loading && localGithub?.not_connected) {
     return (
       <div style={{ 
         display: 'flex', alignItems: 'center', justifyContent: 'center', 
@@ -107,7 +124,7 @@ export default function GitHubPage({ user, github, token, userEmail }) {
               <span style={{ fontSize: 11, background: 'rgba(0,212,255,0.1)', color: 'var(--cyan)', padding: '1px 8px', borderRadius: 9999, marginLeft: 4 }}>{prs.length}</span>
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {prs.length > 0 ? prs.map((pr, i) => (
+              {(prs || []).length > 0 ? (prs || []).map((pr, i) => (
                 <motion.div key={i} custom={i + 2} initial="hidden" animate="visible" variants={stagger}>
                   <GlowCard>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
@@ -153,10 +170,10 @@ export default function GitHubPage({ user, github, token, userEmail }) {
           <motion.div custom={3} initial="hidden" animate="visible" variants={stagger} style={{ marginTop: 24 }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
               Assigned Issues
-              <span style={{ fontSize: 11, background: 'rgba(0,212,255,0.1)', color: 'var(--cyan)', padding: '1px 8px', borderRadius: 9999 }}>{issues.length}</span>
+              <span style={{ fontSize: 11, background: 'rgba(0,212,255,0.1)', color: 'var(--cyan)', padding: '1px 8px', borderRadius: 9999 }}>{(issues || []).length}</span>
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {issues.length > 0 ? issues.map((issue, i) => (
+              {(issues || []).length > 0 ? (issues || []).map((issue, i) => (
                 <GlowCard key={i}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
