@@ -23,7 +23,7 @@ export default function Login({ onLogin }) {
         console.error('Failed to fetch user profile', err)
       }
     },
-    scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+    scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly',
   })
 
   return (
