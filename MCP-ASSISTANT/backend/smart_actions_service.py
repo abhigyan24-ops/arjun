@@ -30,7 +30,7 @@ No subject line. No "Dear" prefix needed.
 Keep it concise and professional."""
 
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             messages=[
                 {
                     "role": "system",
@@ -86,7 +86,7 @@ Provide:
 Keep it concise and actionable."""
 
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             messages=[
                 {
                     "role": "system",

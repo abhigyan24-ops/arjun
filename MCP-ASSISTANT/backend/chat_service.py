@@ -33,7 +33,7 @@ def process_chat(message: str, google_token: str, context: dict = {}):
                     "content": user_content,
                 }
             ],
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
         )
         
         return chat_completion.choices[0].message.content

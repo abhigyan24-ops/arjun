@@ -57,7 +57,7 @@ NO explanation. Just raw JSON exactly like this:
 }}
 """
         response = client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             messages=[
                 {
                     "role": "system", 
@@ -119,7 +119,7 @@ Format: "Yesterday I worked on [summary of commits/PRs]. Today I plan to [next s
 Keep it under 3 sentences. Return ONLY the standup text, no quotes, no markdown.
 """
         response = client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             messages=[
                 {
                     "role": "system",
