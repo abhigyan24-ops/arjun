@@ -42,10 +42,46 @@ def get_slack_data(user_email=None):
         return {"not_connected": True, "recent_messages": [], "channels": []}
     return None
 
+def resolve_usernames(user_ids, headers):
+    """
+    Given a list of Slack user IDs and auth headers, return a dict
+    { user_id: display_name } by calling users.info for each unique ID.
+    Results are cached within the call to avoid duplicate API requests.
+    """
+    cache = {}
+    for uid in set(user_ids):
+        if not uid:
+            continue
+        try:
+            res = requests.get(
+                "https://slack.com/api/users.info",
+                headers=headers,
+                params={"user": uid}
+            )
+            data = res.json()
+            if data.get("ok") and data.get("user"):
+                profile = data["user"].get("profile", {})
+                display_name = (
+                    profile.get("display_name")
+                    or profile.get("real_name")
+                    or data["user"].get("real_name")
+                    or uid
+                )
+                cache[uid] = display_name
+            else:
+                cache[uid] = uid  # fallback to raw ID
+        except Exception as e:
+            print(f"[slack_service] Could not resolve user {uid}: {e}")
+            cache[uid] = uid
+    return cache
+
 def get_channels(user_email=None):
     try:
+        headers = _get_headers(user_email)
+        if not headers:
+            return []
         url = "https://slack.com/api/conversations.list"
-        response = requests.get(url, headers=_get_headers(user_email))
+        response = requests.get(url, headers=headers)
         response.raise_for_status()
         data = response.json()
         if not data.get("ok"):
@@ -67,26 +103,37 @@ def get_channels(user_email=None):
 
 def get_channel_messages(channel_id, limit=10, user_email=None):
     try:
+        headers = _get_headers(user_email)
+        if not headers:
+            return []
         url = "https://slack.com/api/conversations.history"
         params = {"channel": channel_id, "limit": limit}
-        response = requests.get(url, headers=_get_headers(user_email), params=params)
+        response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
         data = response.json()
         if not data.get("ok"):
             print(f"Slack API error: {data.get('error')}")
             return []
-            
+
+        raw_messages = data.get("messages", [])
+
+        # Resolve user IDs → display names
+        user_ids = [msg.get("user", "") for msg in raw_messages]
+        user_map = resolve_usernames(user_ids, headers)
+
         messages = []
-        for msg in data.get("messages", []):
+        for msg in raw_messages:
             ts_str = msg.get("ts", "")
             time_str = ""
             if ts_str:
                 ts = float(ts_str)
-                time_str = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-                
+                time_str = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M')
+
+            uid = msg.get("user", "")
             messages.append({
                 "text": msg.get("text", ""),
-                "user": msg.get("user", ""),
+                "user": uid,
+                "username": user_map.get(uid, uid),
                 "time": time_str,
                 "timestamp": ts_str
             })
@@ -105,9 +152,11 @@ def get_all_unread_messages(user_email=None):
             messages = get_channel_messages(channel_id, limit=5, user_email=user_email)
             for msg in messages:
                 all_messages.append({
-                    "channel": channel_name,
+                    "channel": channel_id,
+                    "channel_name": channel_name,
                     "text": msg["text"],
                     "user": msg["user"],
+                    "username": msg.get("username", msg["user"]),
                     "time": msg["time"]
                 })
         return all_messages
