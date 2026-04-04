@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { MessageSquare, Send, Hash, Clock, MessageSquareOff } from 'lucide-react'
 import GlowCard from '../components/GlowCard'
 import axios from 'axios'
