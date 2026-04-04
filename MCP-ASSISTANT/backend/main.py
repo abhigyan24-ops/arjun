@@ -416,8 +416,14 @@ def get_integrations(user_email: str):
 # ---------- Alert Endpoints ----------
 
 @app.get("/alerts")
-def get_alerts(user_email: str):
+def get_alerts(user_email: str, google_token: str = ""):
     try:
+        from alerts_service import run_alert_check
+        from supabase_service import save_alert
+        if google_token:
+            new_alerts = run_alert_check(google_token)
+            for alert in new_alerts:
+                save_alert(user_email, alert)
         return {
             "alerts": supabase_service.get_alerts(user_email),
             "unread_count": supabase_service.get_unread_count(user_email),
