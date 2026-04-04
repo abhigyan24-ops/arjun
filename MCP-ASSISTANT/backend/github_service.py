@@ -122,7 +122,7 @@ def get_recent_commits(user_email=None):
         if not username:
             return []
 
-        yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+        yesterday = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
 
         res = requests.get(
             f"https://api.github.com/search/commits?q=author:{username}+author-date:>={yesterday}",
