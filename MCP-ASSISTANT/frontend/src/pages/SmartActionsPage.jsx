@@ -55,7 +55,7 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
           start_time: meeting.start_time,
         },
         emails: briefing?.urgent_emails || [],
-        slack_messages: slack || [],
+        slack_messages: [],
         user_email: userEmail,
       })
       setMeetingPrep(res.data.prep || res.data.response || 'No prep generated')
