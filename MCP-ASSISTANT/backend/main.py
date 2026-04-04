@@ -244,6 +244,8 @@ def smart_draft_email(request: EmailDraftRequest):
             supabase_service.save_draft_email(request.user_email, request.email, draft)
         return {"draft": draft}
     except Exception as e:
+        import traceback
+        print(f"[DRAFT EMAIL ERROR] {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/smart/meeting-prep")
