@@ -107,10 +107,12 @@ def get_briefing(request: BriefingRequest):
         events = fetch_today_events(request.google_token)
         slack_messages = get_all_unread_messages(user_email)
         jira_summary = get_jira_summary(user_email)
-        
+        if jira_summary.get("not_connected"):
+            jira_summary = {"total_assigned": 0, "total_overdue": 0, "assigned": []}
+
         # Generate briefing
         briefing = generate_briefing(emails, events, slack_messages)
-        
+
         if isinstance(briefing, dict):
             briefing["jira_summary"] = {
                 "total_assigned": jira_summary.get("total_assigned", 0),
@@ -118,12 +120,12 @@ def get_briefing(request: BriefingRequest):
                 "top_tickets": jira_summary.get("assigned", [])[:3]
             }
             briefing["user_email"] = user_email
-            
+
             # Save to supabase
             if user_email:
                 supabase_service.save_briefing(user_email, briefing)
                 supabase_service.update_last_login(user_email)
-        
+
         return briefing
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -139,6 +141,11 @@ def get_briefing_history(user_email: str):
 @app.get("/slack/channels")
 def fetch_slack_channels(user_email: Optional[str] = None):
     try:
+        # If user_email provided, check connection first
+        if user_email:
+            check = get_slack_data(user_email)
+            if check and check.get("not_connected"):
+                return []
         channels = get_channels(user_email)
         return channels
     except Exception as e:
@@ -147,14 +154,17 @@ def fetch_slack_channels(user_email: Optional[str] = None):
 @app.get("/slack/messages")
 def fetch_slack_messages(user_email: Optional[str] = None):
     try:
+        # Check connection first
         check = get_slack_data(user_email)
         if check and check.get("not_connected"):
-            return {"not_connected": True, "messages": [], "channels": []}
+            return {"not_connected": True, "recent_messages": [], "channels": []}
 
         messages = get_all_unread_messages(user_email)
         if user_email:
             supabase_service.save_slack_history(user_email, "general", messages)
-        return messages
+
+        # Return in the shape SlackPage.jsx expects
+        return {"not_connected": False, "recent_messages": messages}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -173,6 +183,7 @@ def get_github_summary(request: GithubRequest = None):
     try:
         user_email = request.user_email if request else None
 
+        # Check connection — if user_email provided and no token, return not_connected
         check = get_github_data(user_email)
         if check and check.get("not_connected"):
             return {"not_connected": True, "prs": [], "issues": [], "commits": [], "standup": ""}
@@ -184,13 +195,13 @@ def get_github_summary(request: GithubRequest = None):
         standup = generate_standup(prs, issues, commits)
 
         github_data = {
+            "not_connected": False,
             "prs": prs,
             "issues": issues,
             "commits": commits,
             "standup": standup
         }
 
-        user_email = request.user_email if request else None
         if user_email:
             supabase_service.save_github_history(user_email, github_data)
 
@@ -211,62 +222,51 @@ def post_chat(request: ChatRequest):
 @app.get("/jira")
 def get_jira(user_email: Optional[str] = None):
     try:
-        if user_email:
-            from oauth_service import get_jira_credentials
-            creds = get_jira_credentials(user_email)
-            if not creds.get("jira_token") and not creds.get("jira_domain"):
-                return {"not_connected": True, "assigned": [], "sprint": [], "overdue": []}
-
+        # Directly use get_jira_summary — it handles not_connected internally
         jira_data = get_jira_summary(user_email)
+
+        # If not connected, return clean response
+        if jira_data.get("not_connected"):
+            return {"not_connected": True, "assigned": [], "sprint": [], "overdue": []}
+
         if user_email:
             supabase_service.save_jira_history(user_email, jira_data)
+
         return jira_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/smart/draft-email")
-async def draft_email(request: dict):
+def smart_draft_email(request: EmailDraftRequest):
     try:
-        email = request.get("email", {})
-        instruction = request.get("instruction", "")
-        user_email = request.get("user_email", "")
-        draft = draft_email_reply(email, instruction)
-        
-        if user_email:
-            supabase_service.save_draft_email(user_email, email, instruction, draft)
-            
+        draft = draft_email_reply(request.email, request.instruction)
+        if request.user_email:
+            supabase_service.save_draft_email(request.user_email, request.email, draft)
         return {"draft": draft}
     except Exception as e:
-        return {"error": str(e), "draft": ""}
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/smart/meeting-prep")
-def post_meeting_prep(request: MeetingPrepRequest):
+def smart_meeting_prep(request: MeetingPrepRequest):
     try:
         prep = generate_meeting_prep(request.meeting, request.emails, request.slack_messages)
-        
         if request.user_email:
             supabase_service.save_meeting_prep(request.user_email, request.meeting, prep)
-            
         return {"prep": prep}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/mcp/tools")
 def get_mcp_tools():
-    try:
-        return [
-            {"name": "get_emails", "description": "Fetch recent emails from Gmail"},
-            {"name": "get_calendar_events", "description": "Fetch today's calendar events"},
-            {"name": "get_github_prs", "description": "Get open pull requests from GitHub"},
-            {"name": "get_github_issues", "description": "Get assigned GitHub issues"},
-            {"name": "get_slack_messages", "description": "Get recent Slack messages from all channels"},
-            {"name": "send_slack_message", "description": "Send a message to a Slack channel"},
-            {"name": "get_work_summary", "description": "Get a complete summary of all work activity"}
+    return {
+        "tools": [
+            {"name": "get_emails", "description": "Fetch recent emails"},
+            {"name": "get_calendar", "description": "Fetch today's calendar events"},
+            {"name": "get_github", "description": "Fetch GitHub PRs and issues"},
+            {"name": "get_slack", "description": "Fetch Slack messages"},
+            {"name": "get_jira", "description": "Fetch Jira tickets"},
         ]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ---------- OAuth Endpoints ----------
+    }
 
 @app.get("/auth/github")
 def github_auth(user_email: str):
@@ -281,13 +281,13 @@ async def github_auth_callback(code: str, state: str):
             data={
                 "client_id": GITHUB_CLIENT_ID,
                 "client_secret": GITHUB_CLIENT_SECRET,
-                "code": code
+                "code": code,
             },
             headers={"Accept": "application/json"}
         )
         token_data = response.json()
         access_token = token_data.get("access_token")
-        
+
         if access_token:
             user_response = await client.get(
                 "https://api.github.com/user",
@@ -295,13 +295,13 @@ async def github_auth_callback(code: str, state: str):
             )
             user_data = user_response.json()
             login = user_data.get("login")
-            
+
             oauth_service.save_github_integration(
                 user_email=state,
                 token=access_token,
                 username=login
             )
-            
+
     return RedirectResponse(url=f"{FRONTEND_URL}/connections?github=success")
 
 @app.get("/auth/slack")
@@ -324,14 +324,14 @@ async def slack_auth_callback(code: str, state: str):
         data = response.json()
         access_token = data.get("access_token")
         workspace = data.get("team", {}).get("name") if data.get("team") else None
-        
+
         if access_token:
             oauth_service.save_slack_integration(
                 user_email=state,
                 token=access_token,
                 workspace=workspace
             )
-            
+
     return RedirectResponse(url=f"{FRONTEND_URL}/connections?slack=success")
 
 @app.get("/auth/jira")
@@ -355,7 +355,7 @@ async def jira_auth_callback(code: str, state: str):
         token_data = token_response.json()
         access_token = token_data.get("access_token")
         refresh_token = token_data.get("refresh_token")
-        
+
         if access_token:
             resources_res = await client.get(
                 "https://api.atlassian.com/oauth/token/accessible-resources",
@@ -366,14 +366,14 @@ async def jira_auth_callback(code: str, state: str):
                 cloud_id = resources[0].get("id")
                 site_name = resources[0].get("name")
                 domain = f"{site_name}.atlassian.net"
-                
+
                 user_res = await client.get(
                     f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/myself",
                     headers={"Authorization": f"Bearer {access_token}"}
                 )
                 user_data = user_res.json()
                 emailAddress = user_data.get("emailAddress")
-                
+
                 oauth_service.save_jira_integration(
                     user_email=state,
                     token=access_token,
@@ -381,7 +381,7 @@ async def jira_auth_callback(code: str, state: str):
                     domain=domain,
                     jira_email=emailAddress
                 )
-                
+
     return RedirectResponse(url=f"{FRONTEND_URL}/connections?jira=success")
 
 @app.get("/integrations")
@@ -397,7 +397,7 @@ def get_integrations(user_email: str):
                 "slack_workspace": None,
                 "jira_domain": None
             }
-            
+
         return {
             "github": bool(integrations.get("github_token")),
             "slack": bool(integrations.get("slack_token")),
@@ -442,14 +442,13 @@ def check_alerts_now(request: AlertCheckRequest):
     try:
         set_google_token(request.google_token)
         new_alerts = alerts_service.run_alert_check(request.google_token)
-        
-        # Deduplicate before saving
+
         saved_count = 0
         for alert in new_alerts:
             if not supabase_service.alert_exists(request.user_email, alert["source"], alert["title"]):
                 supabase_service.save_alert(request.user_email, alert)
                 saved_count += 1
-                
+
         return {"success": True, "alerts_added": saved_count}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

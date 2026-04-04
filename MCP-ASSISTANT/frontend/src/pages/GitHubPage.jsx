@@ -6,27 +6,30 @@ import { GitPullRequest, GitCommitHorizontal, ExternalLink, Copy, Check, Unplug 
 import GlowCard from '../components/GlowCard'
 import StatusBadge from '../components/StatusBadge'
 
+const BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+
 export default function GitHubPage({ user, github, token, userEmail }) {
   const navigate = useNavigate()
   const [copied, setCopied] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [localGithub, setLocalGithub] = useState(github)
+  const [localGithub, setLocalGithub] = useState(null)
 
   useEffect(() => {
-    if (!userEmail) return;
+    if (!userEmail) return
     const fetchGithub = async () => {
       try {
-        setLoading(true);
-        const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/github`, { user_email: userEmail });
-        setLocalGithub(res.data);
+        setLoading(true)
+        const res = await axios.post(`${BASE}/github`, { user_email: userEmail })
+        setLocalGithub(res.data)
       } catch (e) {
-        console.error(e);
+        console.error('GitHub fetch error:', e)
+        setLocalGithub(null)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
-    fetchGithub();
-  }, [userEmail]);
+    }
+    fetchGithub()
+  }, [userEmail])
 
   const prs = localGithub?.prs || []
   const issues = localGithub?.issues || []
@@ -53,14 +56,11 @@ export default function GitHubPage({ user, github, token, userEmail }) {
 
   if (!loading && localGithub?.not_connected) {
     return (
-      <div style={{ 
-        display: 'flex', alignItems: 'center', justifyContent: 'center', 
-        minHeight: '70vh', padding: 24 
-      }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '70vh', padding: 24 }}>
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
           <GlowCard>
             <div style={{ padding: '40px 60px', textAlign: 'center', maxWidth: 400 }}>
-              <div style={{ 
+              <div style={{
                 width: 64, height: 64, borderRadius: '50%', background: 'rgba(0,212,255,0.1)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px',
                 color: 'var(--cyan)', border: '1px solid rgba(0,212,255,0.2)'
@@ -71,21 +71,15 @@ export default function GitHubPage({ user, github, token, userEmail }) {
               <p style={{ color: 'var(--text2)', marginBottom: 32, lineHeight: 1.6 }}>
                 Connect your GitHub account to see your PRs, issues and commits
               </p>
-              <button 
+              <button
                 onClick={() => navigate('/connections')}
                 style={{
-                  background: 'transparent',
-                  border: '1px solid var(--cyan)',
-                  color: 'var(--cyan)',
-                  padding: '12px 24px',
-                  borderRadius: 8,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 0 15px rgba(0,212,255,0.1)'
+                  background: 'transparent', border: '1px solid var(--cyan)', color: 'var(--cyan)',
+                  padding: '12px 24px', borderRadius: 8, fontWeight: 600, cursor: 'pointer',
+                  transition: 'all 0.2s', boxShadow: '0 0 15px rgba(0,212,255,0.1)'
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0,212,255,0.05)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(0,212,255,0.2)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.boxShadow = '0 0 15px rgba(0,212,255,0.1)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0,212,255,0.05)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
               >
                 Go to Connections
               </button>
@@ -102,17 +96,17 @@ export default function GitHubPage({ user, github, token, userEmail }) {
   }
 
   return (
-    <div style={{ padding: '24px 24px 24px 32px', maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: '24px 24px 24px 40px', maxWidth: 1200, margin: '0 auto' }}>
       {/* Header */}
       <motion.div custom={0} initial="hidden" animate="visible" variants={stagger}
         style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <h2 className="glow-text-title" style={{ fontSize: 24, fontWeight: 700 }}>GitHub</h2>
-        {user?.name && (
+        {localGithub?.username && (
           <span style={{
             fontSize: 11, fontFamily: "'JetBrains Mono', monospace",
             background: 'rgba(0,212,255,0.1)', color: 'var(--cyan)',
             border: '1px solid rgba(0,212,255,0.2)', padding: '3px 10px', borderRadius: 6,
-          }}>@{user.name}</span>
+          }}>@{localGithub.username}</span>
         )}
       </motion.div>
 
@@ -127,7 +121,7 @@ export default function GitHubPage({ user, github, token, userEmail }) {
               <span style={{ fontSize: 11, background: 'rgba(0,212,255,0.1)', color: 'var(--cyan)', padding: '1px 8px', borderRadius: 9999, marginLeft: 4 }}>{prs.length}</span>
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {(prs || []).length > 0 ? (prs || []).map((pr, i) => (
+              {prs.length > 0 ? prs.map((pr, i) => (
                 <motion.div key={i} custom={i + 2} initial="hidden" animate="visible" variants={stagger}>
                   <GlowCard>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
@@ -173,10 +167,10 @@ export default function GitHubPage({ user, github, token, userEmail }) {
           <motion.div custom={3} initial="hidden" animate="visible" variants={stagger} style={{ marginTop: 24 }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
               Assigned Issues
-              <span style={{ fontSize: 11, background: 'rgba(0,212,255,0.1)', color: 'var(--cyan)', padding: '1px 8px', borderRadius: 9999 }}>{(issues || []).length}</span>
+              <span style={{ fontSize: 11, background: 'rgba(0,212,255,0.1)', color: 'var(--cyan)', padding: '1px 8px', borderRadius: 9999 }}>{issues.length}</span>
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {(issues || []).length > 0 ? (issues || []).map((issue, i) => (
+              {issues.length > 0 ? issues.map((issue, i) => (
                 <GlowCard key={i}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -202,7 +196,6 @@ export default function GitHubPage({ user, github, token, userEmail }) {
 
         {/* RIGHT COLUMN */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {/* Recent Commits (placeholder since we don't have commit data from API yet) */}
           <motion.div custom={2} initial="hidden" animate="visible" variants={stagger}>
             <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
               <GitCommitHorizontal size={16} style={{ color: 'var(--cyan)' }} />
@@ -216,7 +209,6 @@ export default function GitHubPage({ user, github, token, userEmail }) {
             </GlowCard>
           </motion.div>
 
-          {/* Standup */}
           <motion.div custom={4} initial="hidden" animate="visible" variants={stagger}>
             <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Today's Standup</h3>
             <GlowCard glow={!!standup}>
