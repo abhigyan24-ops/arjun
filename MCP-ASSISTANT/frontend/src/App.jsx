@@ -43,10 +43,13 @@ function MainApp() {
         standup: githubRes.data?.standup || '',
         not_connected: githubRes.data?.not_connected || false
       })
-      setSlack(slackRes.data?.not_connected ? { not_connected: true, messages: [] } : (slackRes.data || []))
+      setSlack({
+        not_connected: slackRes.data?.not_connected || false,
+        messages: slackRes.data?.recent_messages || []
+      })
       setJira({
         assigned: jiraRes.data?.assigned || [],
-        overdue: jiraRes.data?.overdue || [],
+        overdue: jiraRes.data?.overdue || [], 
         sprint: jiraRes.data?.sprint || [],
         total_assigned: jiraRes.data?.total_assigned || 0,
         total_overdue: jiraRes.data?.total_overdue || 0,

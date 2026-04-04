@@ -13,8 +13,8 @@ export default function SlackPage({ slack, token, userEmail }) {
   const [sending, setSending] = useState(false)
   const [sentHistory, setSentHistory] = useState([])
   const [loading, setLoading] = useState(true)
-  const [localSlack, setLocalSlack] = useState(slack || [])
-  const [notConnected, setNotConnected] = useState(false)
+  const [localSlack, setLocalSlack] = useState(slack?.messages || [])
+  const [notConnected, setNotConnected] = useState(slack?.not_connected || false)
 
   useEffect(() => {
     if (!userEmail) return;
