@@ -57,7 +57,7 @@ NO explanation. Just raw JSON exactly like this:
 }}
 """
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama3-8b-8192",
             messages=[
                 {
                     "role": "system", 
@@ -69,6 +69,7 @@ NO explanation. Just raw JSON exactly like this:
                 }
             ],
             temperature=0.3,
+            max_tokens=400,
         )
 
         raw = response.choices[0].message.content.strip()
@@ -118,7 +119,7 @@ Format: "Yesterday I worked on [summary of commits/PRs]. Today I plan to [next s
 Keep it under 3 sentences. Return ONLY the standup text, no quotes, no markdown.
 """
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama3-8b-8192",
             messages=[
                 {
                     "role": "system",
@@ -130,6 +131,7 @@ Keep it under 3 sentences. Return ONLY the standup text, no quotes, no markdown.
                 }
             ],
             temperature=0.3,
+            max_tokens=400,
         )
 
         return response.choices[0].message.content.strip()
