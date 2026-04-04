@@ -10,3 +10,4 @@ mcp
 apscheduler
 slack_sdk
 supabase
+httpx

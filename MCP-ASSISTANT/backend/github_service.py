@@ -5,16 +5,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-HEADERS = {
-    "Authorization": f"token {GITHUB_TOKEN}",
-    "Accept": "application/vnd.github.v3+json"
-}
+from oauth_service import get_github_token
 
+def _get_headers(user_email):
+    token = get_github_token(user_email)
+    return {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
 
-def get_github_user():
+def get_github_user(user_email=None):
     try:
-        res = requests.get("https://api.github.com/user", headers=HEADERS)
+        res = requests.get("https://api.github.com/user", headers=_get_headers(user_email))
         res.raise_for_status()
         data = res.json()
         return {
@@ -27,16 +29,16 @@ def get_github_user():
         return {"username": "", "name": "", "avatar_url": ""}
 
 
-def get_open_prs():
+def get_open_prs(user_email=None):
     try:
-        user = get_github_user()
+        user = get_github_user(user_email)
         username = user.get("username", "")
         if not username:
             return []
 
         res = requests.get(
             f"https://api.github.com/search/issues?q=is:pr+is:open+author:{username}",
-            headers=HEADERS
+            headers=_get_headers(user_email)
         )
         res.raise_for_status()
         items = res.json().get("items", [])
@@ -58,11 +60,11 @@ def get_open_prs():
         return []
 
 
-def get_assigned_issues():
+def get_assigned_issues(user_email=None):
     try:
         res = requests.get(
             "https://api.github.com/issues?state=open&filter=assigned",
-            headers=HEADERS
+            headers=_get_headers(user_email)
         )
         res.raise_for_status()
         items = res.json()
@@ -85,9 +87,9 @@ def get_assigned_issues():
         return []
 
 
-def get_recent_commits():
+def get_recent_commits(user_email=None):
     try:
-        user = get_github_user()
+        user = get_github_user(user_email)
         username = user.get("username", "")
         if not username:
             return []
@@ -96,7 +98,7 @@ def get_recent_commits():
 
         res = requests.get(
             f"https://api.github.com/search/commits?q=author:{username}+author-date:>={yesterday}",
-            headers={**HEADERS, "Accept": "application/vnd.github.cloak-preview+json"}
+            headers={**_get_headers(user_email), "Accept": "application/vnd.github.cloak-preview+json"}
         )
         res.raise_for_status()
         items = res.json().get("items", [])

@@ -5,16 +5,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
-HEADERS = {
-    "Authorization": f"Bearer {SLACK_BOT_TOKEN}",
-    "Content-Type": "application/json"
-}
+from oauth_service import get_slack_token
 
-def get_channels():
+def _get_headers(user_email):
+    token = get_slack_token(user_email)
+    return {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+def get_channels(user_email=None):
     try:
         url = "https://slack.com/api/conversations.list"
-        response = requests.get(url, headers=HEADERS)
+        response = requests.get(url, headers=_get_headers(user_email))
         response.raise_for_status()
         data = response.json()
         if not data.get("ok"):
@@ -34,11 +37,11 @@ def get_channels():
         print(f"Error fetching channels: {e}")
         return []
 
-def get_channel_messages(channel_id, limit=10):
+def get_channel_messages(channel_id, limit=10, user_email=None):
     try:
         url = "https://slack.com/api/conversations.history"
         params = {"channel": channel_id, "limit": limit}
-        response = requests.get(url, headers=HEADERS, params=params)
+        response = requests.get(url, headers=_get_headers(user_email), params=params)
         response.raise_for_status()
         data = response.json()
         if not data.get("ok"):
@@ -64,14 +67,14 @@ def get_channel_messages(channel_id, limit=10):
         print(f"Error fetching messages for channel {channel_id}: {e}")
         return []
 
-def get_all_unread_messages():
+def get_all_unread_messages(user_email=None):
     try:
-        channels = get_channels()
+        channels = get_channels(user_email)
         all_messages = []
         for channel in channels:
             channel_id = channel["id"]
             channel_name = channel["name"]
-            messages = get_channel_messages(channel_id, limit=5)
+            messages = get_channel_messages(channel_id, limit=5, user_email=user_email)
             for msg in messages:
                 all_messages.append({
                     "channel": channel_name,
@@ -84,11 +87,11 @@ def get_all_unread_messages():
         print(f"Error fetching all unread messages: {e}")
         return []
 
-def send_message(channel_id, message):
+def send_message(channel_id, message, user_email=None):
     try:
         url = "https://slack.com/api/chat.postMessage"
         payload = {"channel": channel_id, "text": message}
-        response = requests.post(url, headers=HEADERS, json=payload)
+        response = requests.post(url, headers=_get_headers(user_email), json=payload)
         response.raise_for_status()
         data = response.json()
         return {

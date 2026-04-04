@@ -1,9 +1,12 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 import os
+import httpx
+import oauth_service
 from chat_service import process_chat
 import alerts_service
 import supabase_service
@@ -21,6 +24,14 @@ from smart_actions_service import draft_email_reply, generate_meeting_prep
 
 # Load .env variables
 load_dotenv()
+
+GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
+GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
+SLACK_CLIENT_ID = os.getenv("SLACK_CLIENT_ID")
+SLACK_CLIENT_SECRET = os.getenv("SLACK_CLIENT_SECRET")
+JIRA_CLIENT_ID = os.getenv("JIRA_CLIENT_ID")
+JIRA_CLIENT_SECRET = os.getenv("JIRA_CLIENT_SECRET")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://work-mind-ai.vercel.app")
 
 app = FastAPI()
 
@@ -44,6 +55,7 @@ class BriefingRequest(BaseModel):
 class SlackSendRequest(BaseModel):
     channel_id: str
     message: str
+    user_email: Optional[str] = None
 
 class ChatRequest(BaseModel):
     message: str
@@ -93,8 +105,8 @@ def get_briefing(request: BriefingRequest):
         # Fetch data
         emails = fetch_recent_emails(request.google_token)
         events = fetch_today_events(request.google_token)
-        slack_messages = get_all_unread_messages()
-        jira_summary = get_jira_summary()
+        slack_messages = get_all_unread_messages(user_email)
+        jira_summary = get_jira_summary(user_email)
         
         # Generate briefing
         briefing = generate_briefing(emails, events, slack_messages)
@@ -125,9 +137,9 @@ def get_briefing_history(user_email: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/slack/channels")
-def fetch_slack_channels():
+def fetch_slack_channels(user_email: Optional[str] = None):
     try:
-        channels = get_channels()
+        channels = get_channels(user_email)
         return channels
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -135,7 +147,7 @@ def fetch_slack_channels():
 @app.get("/slack/messages")
 def fetch_slack_messages(user_email: Optional[str] = None):
     try:
-        messages = get_all_unread_messages()
+        messages = get_all_unread_messages(user_email)
         if user_email:
             supabase_service.save_slack_history(user_email, "general", messages)
         return messages
@@ -145,7 +157,7 @@ def fetch_slack_messages(user_email: Optional[str] = None):
 @app.post("/slack/send")
 def post_slack_message(request: SlackSendRequest):
     try:
-        response = send_message(request.channel_id, request.message)
+        response = send_message(request.channel_id, request.message, request.user_email)
         if not response.get("ok"):
             raise HTTPException(status_code=500, detail=response.get("message"))
         return response
@@ -155,9 +167,10 @@ def post_slack_message(request: SlackSendRequest):
 @app.post("/github")
 def get_github_summary(request: GithubRequest = None):
     try:
-        prs = get_open_prs()
-        issues = get_assigned_issues()
-        commits = get_recent_commits()
+        user_email = request.user_email if request else None
+        prs = get_open_prs(user_email)
+        issues = get_assigned_issues(user_email)
+        commits = get_recent_commits(user_email)
 
         standup = generate_standup(prs, issues, commits)
 
@@ -189,7 +202,7 @@ def post_chat(request: ChatRequest):
 @app.get("/jira")
 def get_jira(user_email: Optional[str] = None):
     try:
-        jira_data = get_jira_summary()
+        jira_data = get_jira_summary(user_email)
         if user_email:
             supabase_service.save_jira_history(user_email, jira_data)
         return jira_data
@@ -235,6 +248,149 @@ def get_mcp_tools():
             {"name": "send_slack_message", "description": "Send a message to a Slack channel"},
             {"name": "get_work_summary", "description": "Get a complete summary of all work activity"}
         ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ---------- OAuth Endpoints ----------
+
+@app.get("/auth/github")
+def github_auth(user_email: str):
+    url = f"https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&scope=repo,user&state={user_email}"
+    return RedirectResponse(url=url)
+
+@app.get("/auth/github/callback")
+async def github_auth_callback(code: str, state: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://github.com/login/oauth/access_token",
+            data={
+                "client_id": GITHUB_CLIENT_ID,
+                "client_secret": GITHUB_CLIENT_SECRET,
+                "code": code
+            },
+            headers={"Accept": "application/json"}
+        )
+        token_data = response.json()
+        access_token = token_data.get("access_token")
+        
+        if access_token:
+            user_response = await client.get(
+                "https://api.github.com/user",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            user_data = user_response.json()
+            login = user_data.get("login")
+            
+            oauth_service.save_github_integration(
+                user_email=state,
+                token=access_token,
+                username=login
+            )
+            
+    return RedirectResponse(url=f"{FRONTEND_URL}/connections?github=success")
+
+@app.get("/auth/slack")
+def slack_auth(user_email: str):
+    url = f"https://slack.com/oauth/v2/authorize?client_id={SLACK_CLIENT_ID}&scope=channels:read,channels:history,chat:write,users:read&state={user_email}&redirect_uri=https://workmind-ai-production.up.railway.app/auth/slack/callback"
+    return RedirectResponse(url=url)
+
+@app.get("/auth/slack/callback")
+async def slack_auth_callback(code: str, state: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://slack.com/api/oauth.v2.access",
+            data={
+                "client_id": SLACK_CLIENT_ID,
+                "client_secret": SLACK_CLIENT_SECRET,
+                "code": code,
+                "redirect_uri": "https://workmind-ai-production.up.railway.app/auth/slack/callback"
+            }
+        )
+        data = response.json()
+        access_token = data.get("access_token")
+        workspace = data.get("team", {}).get("name") if data.get("team") else None
+        
+        if access_token:
+            oauth_service.save_slack_integration(
+                user_email=state,
+                token=access_token,
+                workspace=workspace
+            )
+            
+    return RedirectResponse(url=f"{FRONTEND_URL}/connections?slack=success")
+
+@app.get("/auth/jira")
+def jira_auth(user_email: str):
+    url = f"https://auth.atlassian.com/authorize?audience=api.atlassian.com&client_id={JIRA_CLIENT_ID}&scope=read:jira-work%20read:jira-user%20offline_access&redirect_uri=https://workmind-ai-production.up.railway.app/auth/jira/callback&state={user_email}&response_type=code&prompt=consent"
+    return RedirectResponse(url=url)
+
+@app.get("/auth/jira/callback")
+async def jira_auth_callback(code: str, state: str):
+    async with httpx.AsyncClient() as client:
+        token_response = await client.post(
+            "https://auth.atlassian.com/oauth/token",
+            json={
+                "grant_type": "authorization_code",
+                "client_id": JIRA_CLIENT_ID,
+                "client_secret": JIRA_CLIENT_SECRET,
+                "code": code,
+                "redirect_uri": "https://workmind-ai-production.up.railway.app/auth/jira/callback"
+            }
+        )
+        token_data = token_response.json()
+        access_token = token_data.get("access_token")
+        refresh_token = token_data.get("refresh_token")
+        
+        if access_token:
+            resources_res = await client.get(
+                "https://api.atlassian.com/oauth/token/accessible-resources",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            resources = resources_res.json()
+            if resources:
+                cloud_id = resources[0].get("id")
+                site_name = resources[0].get("name")
+                domain = f"{site_name}.atlassian.net"
+                
+                user_res = await client.get(
+                    f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/myself",
+                    headers={"Authorization": f"Bearer {access_token}"}
+                )
+                user_data = user_res.json()
+                emailAddress = user_data.get("emailAddress")
+                
+                oauth_service.save_jira_integration(
+                    user_email=state,
+                    token=access_token,
+                    refresh_token=refresh_token,
+                    domain=domain,
+                    jira_email=emailAddress
+                )
+                
+    return RedirectResponse(url=f"{FRONTEND_URL}/connections?jira=success")
+
+@app.get("/integrations")
+def get_integrations(user_email: str):
+    try:
+        integrations = oauth_service.get_user_integrations(user_email)
+        if not integrations:
+            return {
+                "github": False,
+                "slack": False,
+                "jira": False,
+                "github_username": None,
+                "slack_workspace": None,
+                "jira_domain": None
+            }
+            
+        return {
+            "github": bool(integrations.get("github_token")),
+            "slack": bool(integrations.get("slack_token")),
+            "jira": bool(integrations.get("jira_token")),
+            "github_username": integrations.get("github_username"),
+            "slack_workspace": integrations.get("slack_workspace"),
+            "jira_domain": integrations.get("jira_domain")
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

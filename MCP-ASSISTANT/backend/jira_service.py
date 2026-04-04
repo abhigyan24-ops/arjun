@@ -5,19 +5,27 @@ from requests.auth import HTTPBasicAuth
 
 load_dotenv()
 
-JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN")
-JIRA_EMAIL = os.getenv("JIRA_EMAIL")
-JIRA_DOMAIN = os.getenv("JIRA_DOMAIN")
-BASE_URL = f"https://{JIRA_DOMAIN}/rest/api/2"
-AUTH = HTTPBasicAuth(JIRA_EMAIL, JIRA_API_TOKEN)
+from oauth_service import get_jira_credentials
+
+def _get_jira_config(user_email):
+    creds = get_jira_credentials(user_email)
+    domain = creds.get("jira_domain")
+    return {
+        "base_url": f"https://{domain}/rest/api/2" if domain else "",
+        "domain": domain,
+        "auth": HTTPBasicAuth(creds.get("jira_email"), creds.get("jira_token"))
+    }
+
 HEADERS = {"Accept": "application/json"}
 
 
-def get_current_user_account_id():
+def get_current_user_account_id(user_email=None):
+    config = _get_jira_config(user_email)
+    if not config["base_url"]: return None
     try:
         response = requests.get(
-            f"{BASE_URL}/myself",
-            auth=AUTH,
+            f"{config['base_url']}/myself",
+            auth=config['auth'],
             headers=HEADERS
         )
         response.raise_for_status()
@@ -27,15 +35,17 @@ def get_current_user_account_id():
         return None
 
 
-def get_assigned_tickets():
-    account_id = get_current_user_account_id()
+def get_assigned_tickets(user_email=None):
+    account_id = get_current_user_account_id(user_email)
     if not account_id:
         return []
+    
+    config = _get_jira_config(user_email)
 
     try:
         response = requests.post(
-            f"{BASE_URL}/search/jql",
-            auth=AUTH,
+            f"{config['base_url']}/search/jql",
+            auth=config['auth'],
             headers={"Accept": "application/json", "Content-Type": "application/json"},
             json={
                 "jql": f"assignee={account_id} AND statusCategory != Done ORDER BY priority DESC",
@@ -57,7 +67,7 @@ def get_assigned_tickets():
                 "status": fields.get("status", {}).get("name", ""),
                 "priority": fields.get("priority", {}).get("name", ""),
                 "type": fields.get("issuetype", {}).get("name", ""),
-                "url": f"https://{JIRA_DOMAIN}/browse/{key}"
+                "url": f"https://{config['domain']}/browse/{key}"
             })
         return tickets
 
@@ -66,15 +76,17 @@ def get_assigned_tickets():
         return []
 
 
-def get_overdue_tickets():
-    account_id = get_current_user_account_id()
+def get_overdue_tickets(user_email=None):
+    account_id = get_current_user_account_id(user_email)
     if not account_id:
         return []
+        
+    config = _get_jira_config(user_email)
 
     try:
         response = requests.post(
-            f"{BASE_URL}/search/jql",
-            auth=AUTH,
+            f"{config['base_url']}/search/jql",
+            auth=config['auth'],
             headers={"Accept": "application/json", "Content-Type": "application/json"},
             json={
                 "jql": f"assignee={account_id} AND due <= now() AND statusCategory != Done",
@@ -96,7 +108,7 @@ def get_overdue_tickets():
                 "status": fields.get("status", {}).get("name", ""),
                 "priority": fields.get("priority", {}).get("name", ""),
                 "type": fields.get("issuetype", {}).get("name", ""),
-                "url": f"https://{JIRA_DOMAIN}/browse/{key}"
+                "url": f"https://{config['domain']}/browse/{key}"
             })
         return tickets
 
@@ -105,15 +117,17 @@ def get_overdue_tickets():
         return []
 
 
-def get_sprint_tickets():
-    account_id = get_current_user_account_id()
+def get_sprint_tickets(user_email=None):
+    account_id = get_current_user_account_id(user_email)
     if not account_id:
         return []
+        
+    config = _get_jira_config(user_email)
 
     try:
         response = requests.post(
-            f"{BASE_URL}/search/jql",
-            auth=AUTH,
+            f"{config['base_url']}/search/jql",
+            auth=config['auth'],
             headers={"Accept": "application/json", "Content-Type": "application/json"},
             json={
                 "jql": f"assignee={account_id} AND sprint in openSprints()",
@@ -135,7 +149,7 @@ def get_sprint_tickets():
                 "status": fields.get("status", {}).get("name", ""),
                 "priority": fields.get("priority", {}).get("name", ""),
                 "type": fields.get("issuetype", {}).get("name", ""),
-                "url": f"https://{JIRA_DOMAIN}/browse/{key}"
+                "url": f"https://{config['domain']}/browse/{key}"
             })
         return tickets
 
@@ -144,10 +158,10 @@ def get_sprint_tickets():
         return []
 
 
-def get_jira_summary():
-    assigned = get_assigned_tickets()
-    overdue = get_overdue_tickets()
-    sprint = get_sprint_tickets()
+def get_jira_summary(user_email=None):
+    assigned = get_assigned_tickets(user_email)
+    overdue = get_overdue_tickets(user_email)
+    sprint = get_sprint_tickets(user_email)
 
     return {
         "assigned": assigned,

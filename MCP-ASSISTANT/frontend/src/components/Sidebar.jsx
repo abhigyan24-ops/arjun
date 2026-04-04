@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { LayoutDashboard, GitBranch, MessageSquare, LayoutGrid, Zap, LogOut, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
+import { LayoutDashboard, GitBranch, MessageSquare, LayoutGrid, Zap, LogOut, Clock, ChevronLeft, ChevronRight, Link2 } from 'lucide-react'
 
 export default function Sidebar({ user, onLogout, collapsed, onToggleCollapse }) {
   const location = useLocation()
@@ -13,6 +13,7 @@ export default function Sidebar({ user, onLogout, collapsed, onToggleCollapse })
     { name: 'Slack', path: '/slack', icon: MessageSquare },
     { name: 'Jira', path: '/jira', icon: LayoutGrid },
     { name: 'Smart Actions', path: '/smart', icon: Zap },
+    { name: 'Connections', path: '/connections', icon: Link2 },
     { name: 'History', path: '/history', icon: Clock },
   ]
 

@@ -8,6 +8,7 @@ import GitHubPage from './pages/GitHubPage'
 import SlackPage from './pages/SlackPage'
 import JiraPage from './pages/JiraPage'
 import SmartActionsPage from './pages/SmartActionsPage'
+import ConnectionsPage from './pages/ConnectionsPage'
 import HistoryPage from './pages/HistoryPage'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
@@ -25,14 +26,14 @@ function MainApp() {
   const [slack, setSlack] = useState(null)
   const [jira, setJira] = useState(null)
 
-  const fetchAllData = async (accessToken) => {
+  const fetchAllData = async (accessToken, userEmailParam) => {
     setLoading(true)
     try {
       const [briefingRes, githubRes, slackRes, jiraRes] = await Promise.all([
         axios.post(`${import.meta.env.VITE_BACKEND_URL}/briefing`, { google_token: accessToken }).catch(() => ({ data: null })),
-        axios.post(`${import.meta.env.VITE_BACKEND_URL}/github`, {}).catch(() => ({ data: null })),
-        axios.get(`${import.meta.env.VITE_BACKEND_URL}/slack/messages`).catch(() => ({ data: null })),
-        axios.get(`${import.meta.env.VITE_BACKEND_URL}/jira`).catch(() => ({ data: null })),
+        axios.post(`${import.meta.env.VITE_BACKEND_URL}/github`, { user_email: userEmailParam }).catch(() => ({ data: null })),
+        axios.get(`${import.meta.env.VITE_BACKEND_URL}/slack/messages${userEmailParam ? `?user_email=${userEmailParam}` : ''}`).catch(() => ({ data: null })),
+        axios.get(`${import.meta.env.VITE_BACKEND_URL}/jira${userEmailParam ? `?user_email=${userEmailParam}` : ''}`).catch(() => ({ data: null })),
       ])
 
       setBriefing(briefingRes.data)
@@ -59,7 +60,7 @@ function MainApp() {
   const handleLogin = (userProfile, accessToken) => {
     setUser(userProfile)
     setToken(accessToken)
-    fetchAllData(accessToken)
+    fetchAllData(accessToken, userProfile?.email)
     navigate('/')
   }
 
@@ -74,7 +75,7 @@ function MainApp() {
   }
 
   const handleRefresh = () => {
-    if (token) fetchAllData(token)
+    if (token) fetchAllData(token, user?.email)
   }
 
   if (!user) {
@@ -97,6 +98,7 @@ function MainApp() {
             <Route path="/slack" element={<SlackPage slack={slack} token={token} userEmail={userEmail} />} />
             <Route path="/jira" element={<JiraPage jira={jira} token={token} userEmail={userEmail} />} />
             <Route path="/smart" element={<SmartActionsPage briefing={briefing} token={token} slack={slack} userEmail={userEmail} />} />
+            <Route path="/connections" element={<ConnectionsPage userEmail={userEmail} />} />
             <Route path="/history" element={<HistoryPage userEmail={userEmail} />} />
           </Routes>
         </div>
