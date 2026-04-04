@@ -102,7 +102,7 @@ export default function GitHubPage({ user, github, token, userEmail }) {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: '24px 24px 24px 32px', maxWidth: 1200, margin: '0 auto' }}>
       {/* Header */}
       <motion.div custom={0} initial="hidden" animate="visible" variants={stagger}
         style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>

@@ -5,13 +5,29 @@ from requests.auth import HTTPBasicAuth
 
 load_dotenv()
 
-from oauth_service import get_jira_credentials
+from supabase_service import supabase
+
+def get_user_integration(user_email):
+    if not user_email:
+        return None
+    try:
+        result = supabase.table('user_integrations').select('*').eq('user_email', user_email).execute()
+        if result.data and len(result.data) > 0:
+            return result.data[0]
+        return None
+    except:
+        return None
 
 def _get_jira_config(user_email):
-    creds = get_jira_credentials(user_email)
-    jira_token = creds.get("jira_token")
-    jira_domain = creds.get("jira_domain")
-    jira_email = creds.get("jira_email")
+    if user_email:
+        integration = get_user_integration(user_email)
+        jira_token = integration.get('jira_token') if integration else None
+        jira_domain = integration.get('jira_domain') if integration else None
+        jira_email = integration.get('jira_email') if integration else None
+    else:
+        jira_token = None
+        jira_domain = None
+        jira_email = None
 
     if jira_token:
         # OAuth mode
@@ -28,7 +44,7 @@ def _get_jira_config(user_email):
             if not resources:
                 print(f"No Jira resources found for {user_email}")
                 return {"base_url": "", "domain": jira_domain, "auth": None, "headers": headers}
-            
+
             cloud_id = resources[0]["id"]
             base_url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3"
             print(f"Using Jira cloud_id: {cloud_id}, base_url: {base_url}")
@@ -36,7 +52,7 @@ def _get_jira_config(user_email):
             print(f"Error fetching Jira cloud_id for {user_email}: {e}")
             cloud_id = None
             base_url = ""
-            
+
         return {
             "base_url": base_url,
             "domain": jira_domain,
@@ -44,22 +60,13 @@ def _get_jira_config(user_email):
             "headers": headers
         }
     else:
-        # If user_email is present, we should NOT fall back to global .env
-        # Only fall back if user_email is None or empty (legacy/shared call)
+        # No token found — user is not connected
         if user_email:
             print(f"No Jira token found for {user_email} in Supabase.")
-            return {
-                "base_url": "",
-                "domain": None,
-                "auth": None,
-                "headers": {"Accept": "application/json", "Content-Type": "application/json"}
-            }
-            
-        # Fallback to .env mode for legacy/unauthenticated calls
         return {
-            "base_url": f"https://{jira_domain}/rest/api/2" if jira_domain else "",
-            "domain": jira_domain,
-            "auth": HTTPBasicAuth(jira_email, os.getenv("JIRA_API_TOKEN")),
+            "base_url": "",
+            "domain": None,
+            "auth": None,
             "headers": {"Accept": "application/json", "Content-Type": "application/json"}
         }
 
@@ -209,6 +216,12 @@ def get_sprint_tickets(user_email=None):
 
 
 def get_jira_summary(user_email=None):
+    # Check for token first — return not_connected immediately if missing
+    if user_email:
+        integration = get_user_integration(user_email)
+        if not integration or not integration.get('jira_token'):
+            return {"not_connected": True}
+
     assigned = get_assigned_tickets(user_email)
     overdue = get_overdue_tickets(user_email)
     sprint = get_sprint_tickets(user_email)

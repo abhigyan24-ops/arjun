@@ -18,12 +18,13 @@ export default function SlackPage({ slack, token, userEmail }) {
 
   useEffect(() => {
     if (!userEmail) return;
+    const BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
     const fetchSlack = async () => {
       try {
         setLoading(true);
         const [msgRes, channelRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_BACKEND_URL}/slack/messages?user_email=${userEmail}`),
-          axios.get(`${import.meta.env.VITE_BACKEND_URL}/slack/channels`)
+          axios.get(`${BASE}/slack/messages?user_email=${userEmail}`),
+          axios.get(`${BASE}/slack/channels`)
         ]);
         
         if (msgRes.data?.not_connected) {

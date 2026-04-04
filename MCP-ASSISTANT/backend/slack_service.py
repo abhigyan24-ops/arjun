@@ -5,10 +5,25 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from oauth_service import get_slack_token
+from supabase_service import supabase
+
+def get_user_integration(user_email):
+    if not user_email:
+        return None
+    try:
+        result = supabase.table('user_integrations').select('*').eq('user_email', user_email).execute()
+        if result.data and len(result.data) > 0:
+            return result.data[0]
+        return None
+    except:
+        return None
 
 def _get_headers(user_email):
-    token = get_slack_token(user_email)
+    token = None
+    if user_email:
+        integration = get_user_integration(user_email)
+        if integration:
+            token = integration.get('slack_token')
     if not token:
         return None
     return {
@@ -18,9 +33,13 @@ def _get_headers(user_email):
 
 def get_slack_data(user_email=None):
     """Top-level function that returns not_connected if no token found."""
+    if user_email:
+        integration = get_user_integration(user_email)
+        if not integration or not integration.get('slack_token'):
+            return {"not_connected": True, "recent_messages": [], "channels": []}
     headers = _get_headers(user_email)
-    if headers is None and user_email:
-        return {"not_connected": True}
+    if headers is None:
+        return {"not_connected": True, "recent_messages": [], "channels": []}
     return None
 
 def get_channels(user_email=None):
