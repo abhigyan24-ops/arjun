@@ -100,7 +100,7 @@ function MainApp() {
           <Routes>
             <Route path="/" element={<Overview user={user} token={token} briefing={briefing} github={github} slack={slack} jira={jira} />} />
             <Route path="/github" element={<GitHubPage user={user} github={github} token={token} userEmail={userEmail} />} />
-            <Route path="/slack" element={<SlackPage slack={slack} token={token} userEmail={userEmail} />} />
+            <Route path="/slack" element={<SlackPage googleToken={token} userEmail={userEmail} />} />
             <Route path="/jira" element={<JiraPage jira={jira} token={token} userEmail={userEmail} />} />
             <Route path="/smart" element={<SmartActionsPage briefing={briefing} token={token} slack={slack} userEmail={userEmail} />} />
             <Route path="/connections" element={<ConnectionsPage userEmail={userEmail} />} />

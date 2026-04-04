@@ -1,274 +1,219 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { MessageSquare, Send, Hash, Clock, MessageSquareOff } from 'lucide-react'
-import GlowCard from '../components/GlowCard'
+import { MessageSquare, Send, RefreshCw, Wifi, WifiOff } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 
-export default function SlackPage({ slack, token, userEmail }) {
+const BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+
+export default function SlackPage({ googleToken, userEmail }) {
   const navigate = useNavigate()
-  const [selectedChannel, setSelectedChannel] = useState('')
-  const [channels, setChannels] = useState([])
-  const [message, setMessage] = useState('')
-  const [sending, setSending] = useState(false)
-  const [sentHistory, setSentHistory] = useState([])
+  const [messages, setMessages] = useState([])
+  const [notConnected, setNotConnected] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [localSlack, setLocalSlack] = useState(slack?.messages || [])
-  const [notConnected, setNotConnected] = useState(slack?.not_connected || false)
+  const [error, setError] = useState(null)
+  const [channel, setChannel] = useState('')
+  const [msgText, setMsgText] = useState('')
+  const [sending, setSending] = useState(false)
+  const [channels, setChannels] = useState([])
 
   useEffect(() => {
-    if (!userEmail) return;
-    const BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
-    const fetchSlack = async () => {
-      try {
-        setLoading(true);
-        const [msgRes, channelRes] = await Promise.all([
-          axios.get(`${BASE}/slack/messages?user_email=${userEmail}`),
-          axios.get(`${BASE}/slack/channels`)
-        ]);
-        
-        if (msgRes.data?.not_connected) {
-          setNotConnected(true);
-          return;
-        }
+    if (!userEmail) return
+    fetchSlack()
+    fetchChannels()
+  }, [userEmail])
 
-        if (msgRes.data?.recent_messages) {
-          setLocalSlack(msgRes.data.recent_messages);
-        } else if (Array.isArray(msgRes.data)) {
-          setLocalSlack(msgRes.data);
-        }
-        
-        if (Array.isArray(channelRes.data)) {
-          setChannels(channelRes.data);
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
+  async function fetchSlack() {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await axios.get(`${BASE}/slack/messages`, {
+        params: { user_email: userEmail }
+      })
+      const data = res.data
+      // Defensive: handle any shape
+      if (!data || data.not_connected === true) {
+        setNotConnected(true)
+        setMessages([])
+      } else {
+        setNotConnected(false)
+        // data.recent_messages may be array or undefined
+        const msgs = Array.isArray(data.recent_messages) ? data.recent_messages : []
+        setMessages(msgs)
       }
-    };
-    fetchSlack();
-  }, [userEmail]);
-
-  const messages = localSlack || []
-
-  // Group messages by channel
-  const channelMap = {}
-  (localSlack || []).forEach((msg) => {
-    if (msg && msg.channel) {
-      if (!channelMap[msg.channel]) channelMap[msg.channel] = []
-      channelMap[msg.channel].push(msg)
+    } catch (err) {
+      setError('Failed to load Slack messages. Please try again.')
+      setMessages([])
+    } finally {
+      setLoading(false)
     }
-  })
-  const channelNames = Object.keys(channelMap)
+  }
 
-  const handleSend = async () => {
-    if (!selectedChannel.trim() || !message.trim()) return
+  async function fetchChannels() {
+    try {
+      const res = await axios.get(`${BASE}/slack/channels`, {
+        params: { user_email: userEmail }
+      })
+      const data = res.data
+      if (data && Array.isArray(data.channels)) {
+        setChannels(data.channels)
+        if (data.channels.length > 0) setChannel(data.channels[0].id)
+      }
+    } catch (err) {
+      // silently fail for channels
+    }
+  }
+
+  async function sendMessage() {
+    if (!channel || !msgText.trim()) return
     setSending(true)
     try {
-      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/slack/send`, { channel_id: selectedChannel, message }, {
-        headers: { Authorization: `Bearer ${token}` },
+      await axios.post(`${BASE}/slack/send`, {
+        channel_id: channel,
+        message: msgText,
+        user_email: userEmail
       })
-      const channelName = channels.find((c) => c.id === selectedChannel)?.name || selectedChannel
-      setSentHistory((prev) => [{ channel: channelName, message, time: new Date().toLocaleTimeString() }, ...prev])
-      setMessage('')
-    } catch (_err) {
-      console.error('Failed to send message')
+      setMsgText('')
+      fetchSlack()
+    } catch (err) {
+      setError('Failed to send message.')
     } finally {
       setSending(false)
     }
   }
 
+  // NOT CONNECTED STATE
+  if (notConnected) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center p-10 rounded-2xl border border-white/10"
+          style={{ background: 'rgba(13,13,26,0.8)', backdropFilter: 'blur(2px)' }}
+        >
+          <WifiOff size={48} className="mx-auto mb-4" style={{ color: '#00d4ff' }} />
+          <h2 className="text-2xl font-bold text-white mb-2">Slack Not Connected</h2>
+          <p className="text-white/50 mb-6">Connect your Slack workspace to see messages here.</p>
+          <button
+            onClick={() => navigate('/connections')}
+            className="px-6 py-3 rounded-xl font-semibold text-white"
+            style={{ background: 'linear-gradient(135deg, #00d4ff, #7928ca)' }}
+          >
+            Go to Connections
+          </button>
+        </motion.div>
+      </div>
+    )
+  }
+
+  // LOADING STATE
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '70vh', gap: 16 }}>
-        <motion.div
-          animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(0,212,255,0.2)', border: '2px solid var(--cyan)' }}
-        />
-        <p style={{ color: 'var(--cyan)', fontWeight: 600, fontSize: 14, letterSpacing: '0.05em' }}>Loading Slack...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}>
+          <RefreshCw size={32} style={{ color: '#00d4ff' }} />
+        </motion.div>
       </div>
     )
   }
 
-  if (!loading && notConnected) {
+  // ERROR STATE
+  if (error) {
     return (
-      <div style={{ 
-        display: 'flex', alignItems: 'center', justifyContent: 'center', 
-        minHeight: '70vh', padding: 24 
-      }}>
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-          <GlowCard>
-            <div style={{ padding: '40px 60px', textAlign: 'center', maxWidth: 400 }}>
-              <div style={{ 
-                width: 64, height: 64, borderRadius: '50%', background: 'rgba(255,255,255,0.05)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px',
-                color: 'var(--text2)', border: '1px solid rgba(255,255,255,0.1)'
-              }}>
-                <MessageSquareOff size={32} />
-              </div>
-              <h2 style={{ fontSize: 24, fontWeight: 700, color: '#fff', marginBottom: 12 }}>Slack Not Connected</h2>
-              <p style={{ color: 'var(--text2)', marginBottom: 32, lineHeight: 1.6 }}>
-                Connect your Slack workspace to read and send messages
-              </p>
-              <button 
-                onClick={() => navigate('/connections')}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid var(--cyan)',
-                  color: 'var(--cyan)',
-                  padding: '12px 24px',
-                  borderRadius: 8,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 0 15px rgba(0,212,255,0.1)'
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0,212,255,0.05)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(0,212,255,0.2)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.boxShadow = '0 0 15px rgba(0,212,255,0.1)' }}
-              >
-                Go to Connections
-              </button>
-            </div>
-          </GlowCard>
-        </motion.div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center p-10 rounded-2xl border border-red-500/30"
+          style={{ background: 'rgba(13,13,26,0.8)' }}>
+          <p className="text-red-400 mb-4">{error}</p>
+          <button onClick={fetchSlack}
+            className="px-6 py-3 rounded-xl text-white border border-white/20 hover:border-cyan-400/50 transition-all">
+            Retry
+          </button>
+        </div>
       </div>
     )
   }
 
-  const stagger = {
-    hidden: { opacity: 0, y: 20 },
-    visible: (i) => ({ opacity: 1, y: 0, transition: { delay: i * 0.08, duration: 0.4 } }),
-  }
-
+  // MAIN VIEW
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
-      <motion.h2 custom={0} initial="hidden" animate="visible" variants={stagger}
-        className="glow-text-title"
-        style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>Slack</motion.h2>
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
+      {/* Header */}
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <MessageSquare size={28} style={{ color: '#00d4ff' }} />
+          <h1 className="text-3xl font-bold text-white">Slack</h1>
+        </div>
+        <button onClick={fetchSlack}
+          className="p-2 rounded-xl border border-white/10 hover:border-cyan-400/50 transition-all"
+          style={{ background: 'rgba(13,13,26,0.6)' }}>
+          <RefreshCw size={18} style={{ color: '#00d4ff' }} />
+        </button>
+      </motion.div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 24 }}>
-        {/* LEFT: Channel Feed */}
-        <motion.div custom={1} initial="hidden" animate="visible" variants={stagger}>
-          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <MessageSquare size={16} style={{ color: 'var(--cyan)' }} /> Channels
-          </h3>
+      {/* Send Message */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+        className="p-5 rounded-2xl border border-white/10 space-y-3"
+        style={{ background: 'rgba(13,13,26,0.8)', backdropFilter: 'blur(2px)' }}>
+        <h2 className="text-white font-semibold">Send a Message</h2>
+        <div className="flex gap-3">
+          <select value={channel} onChange={e => setChannel(e.target.value)}
+            className="flex-1 px-3 py-2 rounded-xl text-white text-sm border border-white/10 outline-none"
+            style={{ background: '#0d0d1a' }}>
+            {channels.length === 0 && <option value="">No channels found</option>}
+            {channels.map(c => (
+              <option key={c.id} value={c.id}>#{c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex gap-3">
+          <input
+            type="text"
+            value={msgText}
+            onChange={e => setMsgText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && sendMessage()}
+            placeholder="Type your message..."
+            className="flex-1 px-4 py-2 rounded-xl text-white text-sm border border-white/10 outline-none placeholder-white/30"
+            style={{ background: '#0d0d1a' }}
+          />
+          <button onClick={sendMessage} disabled={sending}
+            className="px-4 py-2 rounded-xl font-semibold text-white transition-all disabled:opacity-50"
+            style={{ background: 'linear-gradient(135deg, #00d4ff, #7928ca)' }}>
+            {sending ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
+          </button>
+        </div>
+      </motion.div>
 
-            {channelNames.length > 0 ? channelNames.map((ch, ci) => (
-            <div key={ch} style={{ marginBottom: 20 }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                fontSize: 13, fontWeight: 600, color: 'var(--cyan)',
-                fontFamily: "'JetBrains Mono', monospace", marginBottom: 10,
-              }}>
-                <Hash size={14} /> {ch}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {(channelMap[ch] || []).map((msg, mi) => (
-                  <GlowCard key={mi}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{msg.user}</span>
-                      <span style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: 'var(--text2)' }}>
-                        <Clock size={10} style={{ marginRight: 4, verticalAlign: 'middle' }} />{msg.time}
-                      </span>
-                    </div>
-                    <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>{msg.text}</p>
-                  </GlowCard>
-                ))}
-              </div>
-            </div>
-          )) : (
-            <GlowCard>
-              <div style={{ padding: 32, textAlign: 'center', color: 'var(--text2)', fontSize: 13 }}>
-                <MessageSquare size={28} style={{ opacity: 0.2, marginBottom: 8 }} />
-                <p>No Slack messages available</p>
-              </div>
-            </GlowCard>
-          )}
-        </motion.div>
-
-        {/* RIGHT: Send Message */}
-        <motion.div custom={2} initial="hidden" animate="visible" variants={stagger}>
-          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Send size={16} style={{ color: 'var(--cyan)' }} /> New Message
-          </h3>
-          <GlowCard>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {/* Channel selector */}
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Channel</label>
-                <select
-                  value={selectedChannel} onChange={(e) => setSelectedChannel(e.target.value)}
-                  className="liquid-glass"
-                  style={{
-                    width: '100%', color: 'var(--text)',
-                    borderRadius: 8, padding: '10px 12px',
-                    fontSize: 13, outline: 'none',
-                  }}
-                >
-                  <option value="">Select a channel...</option>
-                  {channels.map((ch) => (
-                    <option key={ch.id} value={ch.id}>#{ch.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Message textarea */}
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Message</label>
-                <textarea
-                  value={message} onChange={(e) => setMessage(e.target.value)}
-                  rows={4} placeholder="Type your message..."
-                  className="liquid-glass"
-                  style={{
-                    width: '100%', color: 'var(--text)',
-                    borderRadius: 8, padding: '10px 12px',
-                    fontSize: 13, outline: 'none', resize: 'vertical',
-                    fontFamily: 'inherit',
-                  }}
-                />
-              </div>
-
-              {/* Send button */}
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={handleSend}
-                disabled={sending || !selectedChannel || !message.trim()}
-                style={{
-                  width: '100%', padding: 12, borderRadius: 8, border: 'none',
-                  background: 'linear-gradient(135deg, #00d4ff, #7928ca)', color: '#fff',
-                  fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  opacity: sending || !selectedChannel || !message.trim() ? 0.5 : 1,
-                  boxShadow: '0 0 20px rgba(0,212,255,0.15)', transition: 'opacity 0.2s',
-                }}
-              >
-                <Send size={14} /> {sending ? 'Sending...' : 'Send Message'}
-              </motion.button>
-            </div>
-          </GlowCard>
-
-          {/* Sent history */}
-          {sentHistory.length > 0 && (
-            <div style={{ marginTop: 20 }}>
-              <h4 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', marginBottom: 10 }}>Recently Sent</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {sentHistory.slice(0, 5).map((item, i) => (
-                  <div key={i} className="liquid-glass" style={{
-                    borderRadius: 8, padding: '10px 14px', fontSize: 12,
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ color: 'var(--cyan)', fontFamily: "'JetBrains Mono', monospace" }}>#{item.channel}</span>
-                      <span style={{ color: 'var(--text2)', fontSize: 10 }}>{item.time}</span>
-                    </div>
-                    <p style={{ color: 'var(--text)' }}>{item.message}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </motion.div>
-      </div>
+      {/* Messages */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+        className="p-5 rounded-2xl border border-white/10 space-y-4"
+        style={{ background: 'rgba(13,13,26,0.8)', backdropFilter: 'blur(2px)' }}>
+        <h2 className="text-white font-semibold">Recent Messages</h2>
+        {messages.length === 0 ? (
+          <p className="text-white/40 text-sm text-center py-8">No messages found in your workspace.</p>
+        ) : (
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+            {messages.map((msg, i) => (
+              <motion.div key={i}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.03 }}
+                className="p-3 rounded-xl border border-white/5"
+                style={{ background: 'rgba(0,212,255,0.04)' }}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-cyan-400 text-sm font-semibold">
+                    {msg.user || msg.username || 'Unknown'}
+                  </span>
+                  <span className="text-white/30 text-xs">
+                    {msg.channel_name ? `#${msg.channel_name}` : ''}
+                  </span>
+                </div>
+                <p className="text-white/70 text-sm">{msg.text || msg.content || ''}</p>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </motion.div>
     </div>
   )
 }
