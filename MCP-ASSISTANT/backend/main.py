@@ -256,6 +256,8 @@ def smart_meeting_prep(request: MeetingPrepRequest):
             supabase_service.save_meeting_prep(request.user_email, request.meeting, prep)
         return {"prep": prep}
     except Exception as e:
+        import traceback
+        print(f"[MEETING PREP ERROR] {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/mcp/tools")
