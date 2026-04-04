@@ -36,7 +36,7 @@ export default function Overview({ user, token, briefing, github, slack, jira })
   const fetchAlerts = async () => {
     if (!userEmail) return;
     try {
-      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/alerts?user_email=${userEmail}`)
+      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/alerts?user_email=${userEmail}&google_token=${googleToken}`)
       const data = res.data
       setAlerts(data.alerts)
       setUnreadCount(data.unread_count)
