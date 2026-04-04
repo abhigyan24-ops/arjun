@@ -17,9 +17,10 @@ export default function JiraPage({ jira, token, userEmail }) {
       try {
         setLoading(true);
         const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/jira?user_email=${userEmail}`);
+        console.log('Jira data received:', res.data);
         if (res.data) setLocalJira(res.data);
       } catch (e) {
-        console.error(e);
+        console.error('Error fetching Jira:', e);
       } finally {
         setLoading(false);
       }

@@ -23,10 +23,17 @@ def _get_jira_config(user_email):
         try:
             resp = requests.get("https://api.atlassian.com/oauth/token/accessible-resources", headers={"Authorization": f"Bearer {jira_token}"})
             resp.raise_for_status()
-            cloud_id = resp.json()[0]["id"]
+            resources = resp.json()
+            print(f"Jira accessible-resources for {user_email}: {resources}")
+            if not resources:
+                print(f"No Jira resources found for {user_email}")
+                return {"base_url": "", "domain": jira_domain, "auth": None, "headers": headers}
+            
+            cloud_id = resources[0]["id"]
             base_url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3"
+            print(f"Using Jira cloud_id: {cloud_id}, base_url: {base_url}")
         except Exception as e:
-            print(f"Error fetching Jira cloud_id: {e}")
+            print(f"Error fetching Jira cloud_id for {user_email}: {e}")
             cloud_id = None
             base_url = ""
             
@@ -40,6 +47,7 @@ def _get_jira_config(user_email):
         # If user_email is present, we should NOT fall back to global .env
         # Only fall back if user_email is None or empty (legacy/shared call)
         if user_email:
+            print(f"No Jira token found for {user_email} in Supabase.")
             return {
                 "base_url": "",
                 "domain": None,
@@ -68,9 +76,11 @@ def get_current_user_account_id(user_email=None):
             headers=config['headers']
         )
         response.raise_for_status()
-        return response.json().get("accountId")
+        account_id = response.json().get("accountId")
+        print(f"Jira accountId for {user_email}: {account_id}")
+        return account_id
     except Exception as e:
-        print(f"Error fetching Jira user: {e}")
+        print(f"Error fetching Jira accountId for {user_email}: {e}")
         return None
 
 
@@ -94,6 +104,7 @@ def get_assigned_tickets(user_email=None):
         )
         response.raise_for_status()
         issues = response.json().get("issues", [])
+        print(f"Fetched {len(issues)} assigned Jira tickets for {user_email}")
 
         tickets = []
         for issue in issues[:10]:
