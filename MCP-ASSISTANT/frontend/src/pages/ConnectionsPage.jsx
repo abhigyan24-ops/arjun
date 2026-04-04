@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Github, MessageSquare, Trello } from 'lucide-react';
+import { GitBranch, MessageSquare, Layout } from 'lucide-react';
 
 const ConnectionsPage = ({ userEmail }) => {
   const [integrations, setIntegrations] = useState(null);
@@ -33,7 +33,7 @@ const ConnectionsPage = ({ userEmail }) => {
       id: "github",
       name: "GitHub",
       description: "View your PRs, issues and commits",
-      icon: <Github size={24} color="white" />,
+      icon: <GitBranch size={24} color="white" />,
       connected: integrations?.github,
       details: integrations?.github_username ? `@${integrations.github_username}` : null
     },
@@ -49,7 +49,7 @@ const ConnectionsPage = ({ userEmail }) => {
       id: "jira",
       name: "Jira",
       description: "Track your tickets and sprints",
-      icon: <Trello size={24} color="white" />,
+      icon: <Layout size={24} color="white" />,
       connected: integrations?.jira,
       details: integrations?.jira_domain
     }
