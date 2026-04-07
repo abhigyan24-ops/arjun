@@ -52,9 +52,13 @@ Keep it concise and professional."""
         draft_text = response.choices[0].message.content.strip()
         
         gmail_draft_id = None
+        gmail_error = None
         if google_token and sender != "Unknown":
             try:
-                creds = Credentials(token=google_token)
+                creds = Credentials(
+                    token=google_token,
+                    token_uri="https://oauth2.googleapis.com/token"
+                )
                 service = build('gmail', 'v1', credentials=creds)
                 
                 message = EmailMessage()
@@ -70,12 +74,16 @@ Keep it concise and professional."""
                 draft = service.users().drafts().create(userId='me', body=create_message).execute()
                 gmail_draft_id = draft.get('id')
             except Exception as e:
+                import traceback
                 print(f"Error saving draft to Gmail: {e}")
+                traceback.print_exc()
+                gmail_error = str(e)
         
         return {
             "draft_text": draft_text,
             "draft_id": gmail_draft_id,
-            "draft_url": f"https://mail.google.com/mail/u/0/#drafts?compose={gmail_draft_id}" if gmail_draft_id else None
+            "draft_url": f"https://mail.google.com/mail/u/0/#drafts?compose={gmail_draft_id}" if gmail_draft_id else None,
+            "gmail_error": gmail_error
         }
         
     except Exception as e:
