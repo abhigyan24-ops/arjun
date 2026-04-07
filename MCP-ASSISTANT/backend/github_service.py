@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -6,6 +7,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from supabase_service import supabase
+
+_username_cache = {}
 
 def get_user_integration(user_email):
     if not user_email:
@@ -32,7 +35,6 @@ def _get_headers(user_email):
     }
 
 def get_github_data(user_email=None):
-    """Top-level function that returns not_connected if no token found."""
     if user_email:
         integration = get_user_integration(user_email)
         if not integration or not integration.get('github_token'):
@@ -43,15 +45,21 @@ def get_github_data(user_email=None):
     return None
 
 def get_github_user(user_email=None):
+    global _username_cache
+    if user_email and user_email in _username_cache:
+        return _username_cache[user_email]
     try:
         res = requests.get("https://api.github.com/user", headers=_get_headers(user_email))
         res.raise_for_status()
         data = res.json()
-        return {
+        result = {
             "username": data.get("login", ""),
             "name": data.get("name", ""),
             "avatar_url": data.get("avatar_url", "")
         }
+        if user_email:
+            _username_cache[user_email] = result
+        return result
     except Exception as e:
         print(f"Error fetching GitHub user: {e}")
         return {"username": "", "name": "", "avatar_url": ""}
@@ -63,6 +71,8 @@ def get_open_prs(user_email=None):
         username = user.get("username", "")
         if not username:
             return []
+
+        time.sleep(1)  # avoid rate limit
 
         res = requests.get(
             f"https://api.github.com/search/issues?q=is:pr+is:open+author:{username}",
@@ -121,6 +131,8 @@ def get_recent_commits(user_email=None):
         username = user.get("username", "")
         if not username:
             return []
+
+        time.sleep(1)  # avoid rate limit
 
         yesterday = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
 
