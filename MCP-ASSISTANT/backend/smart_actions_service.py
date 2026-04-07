@@ -2,12 +2,16 @@ import os
 import json
 from groq import Groq
 from dotenv import load_dotenv
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from email.message import EmailMessage
+import base64
 
 load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-def draft_email_reply(original_email: dict, instruction: str = ""):
+def draft_email_reply(original_email: dict, instruction: str = "", google_token: str = ""):
     try:
         sender = original_email.get("sender", "Unknown")
         subject = original_email.get("subject", "No subject")
@@ -45,7 +49,34 @@ Keep it concise and professional."""
             max_tokens=500
         )
         
-        return response.choices[0].message.content.strip()
+        draft_text = response.choices[0].message.content.strip()
+        
+        gmail_draft_id = None
+        if google_token and sender != "Unknown":
+            try:
+                creds = Credentials(token=google_token)
+                service = build('gmail', 'v1', credentials=creds)
+                
+                message = EmailMessage()
+                message.set_content(draft_text)
+                message['To'] = sender
+                
+                new_subject = subject if subject.lower().startswith('re:') else f"Re: {subject}"
+                message['Subject'] = new_subject
+                
+                encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+                create_message = {'message': {'raw': encoded_message}}
+                
+                draft = service.users().drafts().create(userId='me', body=create_message).execute()
+                gmail_draft_id = draft.get('id')
+            except Exception as e:
+                print(f"Error saving draft to Gmail: {e}")
+        
+        return {
+            "draft_text": draft_text,
+            "draft_id": gmail_draft_id,
+            "draft_url": f"https://mail.google.com/mail/u/0/#drafts?compose={gmail_draft_id}" if gmail_draft_id else None
+        }
         
     except Exception as e:
         print(f"Error drafting email: {e}")

@@ -9,6 +9,9 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
   const [selectedEmail, setSelectedEmail] = useState('')
   const [emailInstruction, setEmailInstruction] = useState('')
   const [emailDraft, setEmailDraft] = useState('')
+  const [draftId, setDraftId] = useState('')
+  const [draftUrl, setDraftUrl] = useState('')
+  const [draftSuccessMsg, setDraftSuccessMsg] = useState('')
   const [emailLoading, setEmailLoading] = useState(false)
   const [emailCopied, setEmailCopied] = useState(false)
 
@@ -34,10 +37,23 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
         },
         instruction: emailInstruction,
         user_email: userEmail,
+        google_token: token,
       })
       setEmailDraft(res.data.draft || res.data.response || 'No draft generated')
+      if (res.data.draft_id) {
+          setDraftId(res.data.draft_id)
+          setDraftUrl(res.data.draft_url)
+          setDraftSuccessMsg('Draft saved to your Gmail!')
+      } else {
+          setDraftId('')
+          setDraftUrl('')
+          setDraftSuccessMsg('')
+      }
     } catch (_err) {
       setEmailDraft('Failed to generate draft. Please try again.')
+      setDraftId('')
+      setDraftUrl('')
+      setDraftSuccessMsg('')
     } finally {
       setEmailLoading(false)
     }
@@ -137,14 +153,34 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
                   <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Generated Draft</label>
                   <textarea value={emailDraft} readOnly rows={8} className="liquid-glass"
                     style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }} />
-                  <button onClick={() => copyText(emailDraft, setEmailCopied)} className="liquid-glass"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 500, marginTop: 8,
-                      color: emailCopied ? 'var(--success)' : 'var(--cyan)',
-                      padding: '6px 12px', borderRadius: 6,
-                    }}>
-                    {emailCopied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
-                  </button>
+                  
+                  {draftSuccessMsg && (
+                    <p style={{ fontSize: 12, color: 'var(--success)', marginTop: 8, marginBottom: 8 }}>
+                      {draftSuccessMsg}
+                    </p>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button onClick={() => copyText(emailDraft, setEmailCopied)} className="liquid-glass"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 500,
+                        color: emailCopied ? 'var(--success)' : 'var(--cyan)',
+                        padding: '6px 12px', borderRadius: 6,
+                      }}>
+                      {emailCopied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
+                    </button>
+
+                    {draftUrl && (
+                      <button onClick={() => window.open(draftUrl, '_blank')} className="liquid-glass"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 500,
+                          color: 'var(--text)',
+                          padding: '6px 12px', borderRadius: 6,
+                        }}>
+                        <Mail size={12} /> Open in Gmail
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

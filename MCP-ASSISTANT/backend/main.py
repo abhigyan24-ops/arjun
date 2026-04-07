@@ -67,6 +67,7 @@ class EmailDraftRequest(BaseModel):
     email: dict
     instruction: str = ""
     user_email: Optional[str] = None
+    google_token: str
 
 class MeetingPrepRequest(BaseModel):
     meeting: dict
@@ -239,10 +240,15 @@ def get_jira(user_email: Optional[str] = None):
 @app.post("/smart/draft-email")
 def smart_draft_email(request: EmailDraftRequest):
     try:
-        draft = draft_email_reply(request.email, request.instruction)
+        result = draft_email_reply(request.email, request.instruction, request.google_token)
+        draft_text = result.get("draft_text", "")
         if request.user_email:
-            supabase_service.save_draft_email(request.user_email, request.email, draft, draft)
-        return {"draft": draft}
+            supabase_service.save_draft_email(request.user_email, request.email, draft_text, draft_text)
+        return {
+            "draft": draft_text,
+            "draft_id": result.get("draft_id"),
+            "draft_url": result.get("draft_url")
+        }
     except Exception as e:
         import traceback
         print(f"[DRAFT EMAIL ERROR] {traceback.format_exc()}")
