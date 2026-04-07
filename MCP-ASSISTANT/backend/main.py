@@ -240,7 +240,11 @@ def get_jira(user_email: Optional[str] = None):
 @app.post("/smart/draft-email")
 def smart_draft_email(request: EmailDraftRequest):
     try:
-        result = draft_email_reply(request.email, request.instruction, request.google_token)
+        result = draft_email_reply(
+            original_email=request.email,
+            instruction=request.instruction,
+            google_token=request.google_token
+        )
         draft_text = result.get("draft_text", "")
         if request.user_email:
             supabase_service.save_draft_email(request.user_email, request.email, draft_text, draft_text)

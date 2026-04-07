@@ -39,7 +39,7 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
         user_email: userEmail,
         google_token: token,
       })
-      setEmailDraft(res.data.draft || res.data.response || 'No draft generated')
+      setEmailDraft(res.data.draft_text || res.data.draft || res.data.response || 'No draft generated')
       if (res.data.draft_id) {
           setDraftId(res.data.draft_id)
           setDraftUrl(res.data.draft_url)
