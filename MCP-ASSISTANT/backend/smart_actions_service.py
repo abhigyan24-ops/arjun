@@ -11,6 +11,30 @@ load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
+def send_email_via_gmail(google_token: str, to: str, subject: str, body: str):
+    try:
+        creds = Credentials(
+            token=google_token,
+            token_uri="https://oauth2.googleapis.com/token"
+        )
+        service = build('gmail', 'v1', credentials=creds)
+        
+        message = EmailMessage()
+        message.set_content(body)
+        message['To'] = to
+        message['Subject'] = subject
+        
+        encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        create_message = {'raw': encoded_message}
+        
+        sent_message = service.users().messages().send(userId='me', body=create_message).execute()
+        return {"success": True, "message_id": sent_message.get('id')}
+    except Exception as e:
+        import traceback
+        print(f"Error sending email via Gmail: {e}")
+        traceback.print_exc()
+        raise Exception(f"Failed to send email: {str(e)}")
+
 def draft_email_reply(original_email: dict, instruction: str = "", google_token: str = ""):
     try:
         sender = original_email.get("sender", "Unknown")

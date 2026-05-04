@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Zap, Mail, FileText, Copy, Check } from 'lucide-react'
+import { Zap, Mail, FileText, Copy, Check, Send, X } from 'lucide-react'
 import GlowCard from '../components/GlowCard'
 import axios from 'axios'
 
@@ -14,6 +14,13 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
   const [draftSuccessMsg, setDraftSuccessMsg] = useState('')
   const [emailLoading, setEmailLoading] = useState(false)
   const [emailCopied, setEmailCopied] = useState(false)
+
+  // Send Email Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [sendTo, setSendTo] = useState('')
+  const [sendSubject, setSendSubject] = useState('')
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [toast, setToast] = useState({ show: false, message: '', type: '' })
 
   // Meeting prep state
   const [selectedMeeting, setSelectedMeeting] = useState('')
@@ -79,6 +86,38 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
       setMeetingPrep('Failed to generate prep. Please try again.')
     } finally {
       setMeetingLoading(false)
+    }
+  }
+
+  const openSendModal = () => {
+    if (!selectedEmail) return;
+    const email = emails[parseInt(selectedEmail)]
+    setSendTo(email.sender || '')
+    setSendSubject(email.subject?.toLowerCase().startsWith('re:') ? email.subject : `Re: ${email.subject}`)
+    setIsModalOpen(true)
+  }
+
+  const handleSendEmail = async () => {
+    setSendingEmail(true)
+    try {
+      const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/smart/send-email`, {
+        google_token: token,
+        to_email: sendTo,
+        subject: sendSubject,
+        body: emailDraft,
+        user_email: userEmail
+      })
+      if (res.data.success) {
+        setToast({ show: true, message: 'Email sent from your Gmail!', type: 'success' })
+        setIsModalOpen(false)
+      } else {
+        throw new Error("Failed")
+      }
+    } catch (err) {
+      setToast({ show: true, message: 'Failed to send. Try again.', type: 'error' })
+    } finally {
+      setSendingEmail(false)
+      setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000)
     }
   }
 
@@ -151,7 +190,7 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
               {emailDraft && (
                 <div>
                   <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Generated Draft</label>
-                  <textarea value={emailDraft} readOnly rows={8} className="liquid-glass"
+                  <textarea value={emailDraft} onChange={(e) => setEmailDraft(e.target.value)} rows={8} className="liquid-glass"
                     style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }} />
                   
                   {draftSuccessMsg && (
@@ -165,7 +204,7 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
                       style={{
                         display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 500,
                         color: emailCopied ? 'var(--success)' : 'var(--cyan)',
-                        padding: '6px 12px', borderRadius: 6,
+                        padding: '6px 12px', borderRadius: 6, cursor: 'pointer'
                       }}>
                       {emailCopied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
                     </button>
@@ -175,11 +214,20 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
                         style={{
                           display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 500,
                           color: 'var(--text)',
-                          padding: '6px 12px', borderRadius: 6,
+                          padding: '6px 12px', borderRadius: 6, cursor: 'pointer'
                         }}>
-                        <Mail size={12} /> Open in Gmail
+                        <FileText size={12} /> Save as Draft
                       </button>
                     )}
+
+                    <button onClick={openSendModal} className="liquid-glass"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 500,
+                        color: 'var(--success)',
+                        padding: '6px 12px', borderRadius: 6, cursor: 'pointer'
+                      }}>
+                      <Send size={12} /> Send Now
+                    </button>
                   </div>
                 </div>
               )}
@@ -240,6 +288,78 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
           </GlowCard>
         </motion.div>
       </div>
+
+      {/* Send Email Modal */}
+      {isModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            style={{
+              background: 'rgba(20, 20, 25, 0.95)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: 12, padding: 24, width: '100%', maxWidth: 500,
+              boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
+            }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 600, margin: 0, color: 'var(--text)' }}>Send Email</h3>
+              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, marginBottom: 6, display: 'block', textTransform: 'uppercase' }}>To</label>
+                <input type="text" value={sendTo} onChange={(e) => setSendTo(e.target.value)}
+                  className="liquid-glass" style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, marginBottom: 6, display: 'block', textTransform: 'uppercase' }}>Subject</label>
+                <input type="text" value={sendSubject} onChange={(e) => setSendSubject(e.target.value)}
+                  className="liquid-glass" style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, marginBottom: 6, display: 'block', textTransform: 'uppercase' }}>Body</label>
+                <textarea value={emailDraft} onChange={(e) => setEmailDraft(e.target.value)} rows={6}
+                  className="liquid-glass" style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }} />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
+                <button onClick={() => setIsModalOpen(false)} className="liquid-glass"
+                  style={{ padding: '8px 16px', borderRadius: 6, border: 'none', color: 'var(--text)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+                  Cancel
+                </button>
+                <button onClick={handleSendEmail} disabled={sendingEmail}
+                  style={{
+                    padding: '8px 16px', borderRadius: 6, border: 'none',
+                    background: 'linear-gradient(135deg, #00d4ff, #7928ca)', color: '#fff',
+                    fontSize: 13, fontWeight: 500, opacity: sendingEmail ? 0.7 : 1, cursor: 'pointer'
+                  }}>
+                  {sendingEmail ? 'Sending...' : 'Send'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }}
+          style={{
+            position: 'fixed', bottom: 24, right: 24, zIndex: 1000,
+            background: toast.type === 'success' ? 'rgba(16, 185, 129, 0.9)' : 'rgba(239, 68, 68, 0.9)',
+            color: '#fff', padding: '12px 20px', borderRadius: 8, fontSize: 14, fontWeight: 500,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)', backdropFilter: 'blur(4px)'
+          }}>
+          {toast.message}
+        </motion.div>
+      )}
     </div>
   )
 }

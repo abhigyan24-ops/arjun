@@ -20,7 +20,7 @@ from gemini_service import generate_briefing, generate_standup
 from github_service import get_open_prs, get_assigned_issues, get_recent_commits, get_github_data
 from slack_service import get_channels, get_all_unread_messages, send_message, get_slack_data
 from jira_service import get_jira_summary
-from smart_actions_service import draft_email_reply, generate_meeting_prep
+from smart_actions_service import draft_email_reply, generate_meeting_prep, send_email_via_gmail
 
 # Load .env variables
 load_dotenv()
@@ -68,6 +68,13 @@ class EmailDraftRequest(BaseModel):
     instruction: str = ""
     user_email: Optional[str] = None
     google_token: str
+
+class EmailSendRequest(BaseModel):
+    google_token: str
+    to_email: str
+    subject: str
+    body: str
+    user_email: Optional[str] = None
 
 class MeetingPrepRequest(BaseModel):
     meeting: dict
@@ -255,7 +262,21 @@ def smart_draft_email(request: EmailDraftRequest):
         }
     except Exception as e:
         import traceback
-        print(f"[DRAFT EMAIL ERROR] {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/smart/send-email")
+def smart_send_email(request: EmailSendRequest):
+    try:
+        result = send_email_via_gmail(
+            google_token=request.google_token,
+            to=request.to_email,
+            subject=request.subject,
+            body=request.body
+        )
+        return result
+    except Exception as e:
+        import traceback
+        print(f"[SEND EMAIL ERROR] {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/smart/meeting-prep")
