@@ -4,6 +4,7 @@ from groq import Groq
 from dotenv import load_dotenv
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from email.message import EmailMessage
 import base64
 
@@ -218,8 +219,19 @@ def create_calendar_meeting(google_token: str, meeting_data: dict):
             "meeting_link": created_event.get('hangoutLink'),
             "calendar_link": created_event.get('htmlLink')
         }
+    except HttpError as e:
+        import traceback
+        print(f"HttpError creating calendar meeting: {e}")
+        traceback.print_exc()
+        if e.resp.status == 403:
+            return {
+                "success": False, 
+                "error": "insufficient_scope", 
+                "message": "Calendar permission not granted. Please log out and log back in."
+            }
+        return {"success": False, "error": str(e)}
     except Exception as e:
         import traceback
         print(f"Error creating calendar meeting: {e}")
         traceback.print_exc()
-        raise Exception(f"Failed to create meeting: {str(e)}")
+        return {"success": False, "error": str(e)}
