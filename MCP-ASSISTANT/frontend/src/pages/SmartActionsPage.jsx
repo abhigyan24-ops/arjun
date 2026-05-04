@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Zap, Mail, FileText, Copy, Check, Send, X } from 'lucide-react'
+import { Zap, Mail, FileText, Copy, Check, Send, X, Calendar, Video } from 'lucide-react'
 import GlowCard from '../components/GlowCard'
 import axios from 'axios'
 
@@ -21,6 +21,18 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
   const [sendSubject, setSendSubject] = useState('')
   const [sendingEmail, setSendingEmail] = useState(false)
   const [toast, setToast] = useState({ show: false, message: '', type: '' })
+
+  // Create Meeting state
+  const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false)
+  const [meetingTitle, setMeetingTitle] = useState('')
+  const [meetingDate, setMeetingDate] = useState('')
+  const [meetingStartTime, setMeetingStartTime] = useState('')
+  const [meetingEndTime, setMeetingEndTime] = useState('')
+  const [meetingAttendees, setMeetingAttendees] = useState('')
+  const [meetingAgenda, setMeetingAgenda] = useState('')
+  const [creatingMeeting, setCreatingMeeting] = useState(false)
+  const [createdMeetingLink, setCreatedMeetingLink] = useState('')
+  const [createdCalendarLink, setCreatedCalendarLink] = useState('')
 
   // Meeting prep state
   const [selectedMeeting, setSelectedMeeting] = useState('')
@@ -127,6 +139,36 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
     }
   }
 
+  const handleCreateMeeting = async () => {
+    setCreatingMeeting(true)
+    try {
+      const attendeesList = meetingAttendees.split(',').map(e => e.trim()).filter(e => e)
+      const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/smart/create-meeting`, {
+        google_token: token,
+        user_email: userEmail,
+        title: meetingTitle,
+        date: meetingDate,
+        start_time: meetingStartTime,
+        end_time: meetingEndTime,
+        attendees: attendeesList,
+        agenda: meetingAgenda
+      })
+      if (res.data.success) {
+        setToast({ show: true, message: 'Meeting created successfully!', type: 'success' })
+        setCreatedMeetingLink(res.data.meeting_link)
+        setCreatedCalendarLink(res.data.calendar_link)
+        setIsMeetingModalOpen(false)
+      } else {
+        throw new Error("Failed")
+      }
+    } catch (err) {
+      setToast({ show: true, message: 'Failed to create meeting. Try again.', type: 'error' })
+    } finally {
+      setCreatingMeeting(false)
+      setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000)
+    }
+  }
+
   const copyText = (text, setCopied) => {
     navigator.clipboard.writeText(text)
     setCopied(true)
@@ -152,7 +194,7 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
         <h2 className="glow-text-title" style={{ fontSize: 24, fontWeight: 700 }}>Smart Actions</h2>
       </motion.div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24 }}>
         {/* LEFT: Email Draft */}
         <motion.div custom={1} initial="hidden" animate="visible" variants={stagger}>
           <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -293,6 +335,49 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
             </div>
           </GlowCard>
         </motion.div>
+
+        {/* NEW CARD: Create Meeting */}
+        <motion.div custom={3} initial="hidden" animate="visible" variants={stagger}>
+          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Calendar size={16} style={{ color: 'var(--green)' }} /> Create Meeting
+          </h3>
+          <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>Schedule a Google Meet directly</p>
+
+          <GlowCard>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <motion.button whileTap={{ scale: 0.97 }} onClick={() => setIsMeetingModalOpen(true)}
+                style={{
+                  width: '100%', padding: 12, borderRadius: 8, border: 'none',
+                  background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff',
+                  fontSize: 14, fontWeight: 600,
+                  boxShadow: '0 0 20px rgba(16,185,129,0.15)', transition: 'opacity 0.2s',
+                }}>
+                Schedule a Meeting
+              </motion.button>
+
+              {createdMeetingLink && (
+                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                  <button onClick={() => window.open(createdMeetingLink, '_blank')} className="liquid-glass"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 500,
+                      color: 'var(--success)', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', flex: 1, justifyContent: 'center'
+                    }}>
+                    <Video size={12} /> Join Meeting
+                  </button>
+                  {createdCalendarLink && (
+                    <button onClick={() => window.open(createdCalendarLink, '_blank')} className="liquid-glass"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 500,
+                        color: 'var(--text)', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', flex: 1, justifyContent: 'center'
+                      }}>
+                        <Calendar size={12} /> View in Calendar
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </GlowCard>
+        </motion.div>
       </div>
 
       {/* Send Email Modal */}
@@ -347,6 +432,83 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
                     fontSize: 13, fontWeight: 500, opacity: sendingEmail ? 0.7 : 1, cursor: 'pointer'
                   }}>
                   {sendingEmail ? 'Sending...' : 'Send'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Create Meeting Modal */}
+      {isMeetingModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            style={{
+              background: 'rgba(20, 20, 25, 0.95)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: 12, padding: 24, width: '100%', maxWidth: 500,
+              boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
+              maxHeight: '90vh', overflowY: 'auto'
+            }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 600, margin: 0, color: 'var(--text)' }}>Create Meeting</h3>
+              <button onClick={() => setIsMeetingModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, marginBottom: 6, display: 'block', textTransform: 'uppercase' }}>Meeting Title</label>
+                <input type="text" value={meetingTitle} onChange={(e) => setMeetingTitle(e.target.value)}
+                  className="liquid-glass" style={inputStyle} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, marginBottom: 6, display: 'block', textTransform: 'uppercase' }}>Date</label>
+                  <input type="date" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)}
+                    className="liquid-glass" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, marginBottom: 6, display: 'block', textTransform: 'uppercase' }}>Start Time</label>
+                  <input type="time" value={meetingStartTime} onChange={(e) => setMeetingStartTime(e.target.value)}
+                    className="liquid-glass" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, marginBottom: 6, display: 'block', textTransform: 'uppercase' }}>End Time</label>
+                  <input type="time" value={meetingEndTime} onChange={(e) => setMeetingEndTime(e.target.value)}
+                    className="liquid-glass" style={inputStyle} />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, marginBottom: 6, display: 'block', textTransform: 'uppercase' }}>Attendees (comma separated)</label>
+                <input type="text" value={meetingAttendees} onChange={(e) => setMeetingAttendees(e.target.value)}
+                  className="liquid-glass" style={inputStyle} placeholder="example1@mail.com, example2@mail.com" />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, marginBottom: 6, display: 'block', textTransform: 'uppercase' }}>Agenda / Description</label>
+                <textarea value={meetingAgenda} onChange={(e) => setMeetingAgenda(e.target.value)} rows={4}
+                  className="liquid-glass" style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }} />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
+                <button onClick={() => setIsMeetingModalOpen(false)} className="liquid-glass"
+                  style={{ padding: '8px 16px', borderRadius: 6, border: 'none', color: 'var(--text)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+                  Cancel
+                </button>
+                <button onClick={handleCreateMeeting} disabled={creatingMeeting}
+                  style={{
+                    padding: '8px 16px', borderRadius: 6, border: 'none',
+                    background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff',
+                    fontSize: 13, fontWeight: 500, opacity: creatingMeeting ? 0.7 : 1, cursor: 'pointer'
+                  }}>
+                  {creatingMeeting ? 'Creating...' : 'Create Meeting'}
                 </button>
               </div>
             </div>

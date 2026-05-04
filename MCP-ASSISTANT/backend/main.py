@@ -20,7 +20,7 @@ from gemini_service import generate_briefing, generate_standup
 from github_service import get_open_prs, get_assigned_issues, get_recent_commits, get_github_data
 from slack_service import get_channels, get_all_unread_messages, send_message, get_slack_data
 from jira_service import get_jira_summary
-from smart_actions_service import draft_email_reply, generate_meeting_prep, send_email_via_gmail
+from smart_actions_service import draft_email_reply, generate_meeting_prep, send_email_via_gmail, create_calendar_meeting
 
 # Load .env variables
 load_dotenv()
@@ -81,6 +81,16 @@ class MeetingPrepRequest(BaseModel):
     emails: list = []
     slack_messages: list = []
     user_email: str = ""
+
+class CreateMeetingRequest(BaseModel):
+    google_token: str
+    user_email: str
+    title: str
+    date: str
+    start_time: str
+    end_time: str
+    attendees: list[str]
+    agenda: str
 
 class GithubRequest(BaseModel):
     user_email: Optional[str] = None
@@ -290,6 +300,24 @@ def smart_meeting_prep(request: MeetingPrepRequest):
     except Exception as e:
         import traceback
         print(f"[MEETING PREP ERROR] {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/smart/create-meeting")
+def smart_create_meeting(request: CreateMeetingRequest):
+    try:
+        meeting_data = {
+            "title": request.title,
+            "date": request.date,
+            "start_time": request.start_time,
+            "end_time": request.end_time,
+            "attendees": request.attendees,
+            "agenda": request.agenda
+        }
+        result = create_calendar_meeting(request.google_token, meeting_data)
+        return result
+    except Exception as e:
+        import traceback
+        print(f"[CREATE MEETING ERROR] {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/mcp/tools")

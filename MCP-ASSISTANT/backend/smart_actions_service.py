@@ -169,3 +169,57 @@ Keep it concise and actionable."""
     except Exception as e:
         print(f"Error generating meeting prep: {e}")
         raise Exception(f"Failed to generate prep: {str(e)}")
+
+def create_calendar_meeting(google_token: str, meeting_data: dict):
+    import os
+    try:
+        creds = Credentials(
+            token=google_token,
+            token_uri="https://oauth2.googleapis.com/token"
+        )
+        service = build('calendar', 'v3', credentials=creds)
+        
+        start_datetime = f"{meeting_data['date']}T{meeting_data['start_time']}:00"
+        end_datetime = f"{meeting_data['date']}T{meeting_data['end_time']}:00"
+        
+        attendees_list = [{'email': email.strip()} for email in meeting_data.get('attendees', []) if email.strip()]
+        
+        event = {
+            'summary': meeting_data.get('title', 'Meeting'),
+            'description': meeting_data.get('agenda', ''),
+            'start': {
+                'dateTime': start_datetime,
+                'timeZone': 'Asia/Kolkata',
+            },
+            'end': {
+                'dateTime': end_datetime,
+                'timeZone': 'Asia/Kolkata',
+            },
+            'attendees': attendees_list,
+            'conferenceData': {
+                'createRequest': {
+                    'requestId': f"meeting-{os.urandom(4).hex()}",
+                    'conferenceSolutionKey': {
+                        'type': 'hangoutsMeet'
+                    }
+                }
+            }
+        }
+        
+        created_event = service.events().insert(
+            calendarId='primary', 
+            body=event, 
+            conferenceDataVersion=1
+        ).execute()
+        
+        return {
+            "success": True,
+            "event_id": created_event.get('id'),
+            "meeting_link": created_event.get('hangoutLink'),
+            "calendar_link": created_event.get('htmlLink')
+        }
+    except Exception as e:
+        import traceback
+        print(f"Error creating calendar meeting: {e}")
+        traceback.print_exc()
+        raise Exception(f"Failed to create meeting: {str(e)}")
