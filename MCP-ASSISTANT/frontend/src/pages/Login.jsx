@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useGoogleLogin } from '@react-oauth/google'
 import { motion } from 'framer-motion'
 import axios from 'axios'
-import WebGLShader from '../components/WebGLShader'
+import ElegantBackground from '../components/ElegantBackground'
 
 export default function Login({ onLogin }) {
   const [btnHovered, setBtnHovered] = useState(false)
@@ -28,8 +28,8 @@ export default function Login({ onLogin }) {
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', background: 'transparent', overflow: 'hidden' }}>
-      {/* WebGL Background */}
-      <WebGLShader />
+      {/* Elegant Background */}
+      <ElegantBackground />
 
       {/* All content above the animation */}
       <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

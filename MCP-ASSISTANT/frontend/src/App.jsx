@@ -12,7 +12,7 @@ import ConnectionsPage from './pages/ConnectionsPage'
 import HistoryPage from './pages/HistoryPage'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
-import WebGLShader from './components/WebGLShader'
+import ElegantBackground from './components/ElegantBackground'
 
 function MainApp() {
   const [user, setUser] = useState(null)
@@ -91,7 +91,7 @@ function MainApp() {
 
   return (
     <>
-      <WebGLShader />
+      <ElegantBackground />
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', width: '100%', minHeight: '100vh', background: 'transparent', color: 'var(--text)' }}>
         <Sidebar user={user} onLogout={handleLogout} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(c => !c)} />
         <div style={{ flex: 1, marginLeft: sidebarCollapsed ? 64 : 240, position: 'relative', transition: 'margin-left 300ms ease-in-out' }}>
