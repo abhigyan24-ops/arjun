@@ -89,10 +89,16 @@ export default function SmartActionsPage({ briefing, token, slack, userEmail }) 
     }
   }
 
+  const extractEmail = (sender) => {
+    if (!sender) return '';
+    const match = sender.match(/<(.+)>/);
+    return match ? match[1] : sender;
+  }
+
   const openSendModal = () => {
     if (!selectedEmail) return;
     const email = emails[parseInt(selectedEmail)]
-    setSendTo(email.sender || '')
+    setSendTo(extractEmail(email.sender))
     setSendSubject(email.subject?.toLowerCase().startsWith('re:') ? email.subject : `Re: ${email.subject}`)
     setIsModalOpen(true)
   }
