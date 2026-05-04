@@ -321,7 +321,7 @@ async def github_auth_callback(code: str, state: str):
 
 @app.get("/auth/slack")
 def slack_auth(user_email: str):
-    url = f"https://slack.com/oauth/v2/authorize?client_id={SLACK_CLIENT_ID}&scope=channels:read,channels:history,chat:write,users:read&state={user_email}&redirect_uri=https://workmind-ai-production.up.railway.app/auth/slack/callback"
+    url = f"https://slack.com/oauth/v2/authorize?client_id={SLACK_CLIENT_ID}&scope=channels:read,channels:history,chat:write,users:read&state={user_email}&redirect_uri=https://workmind-ai-production-8ca2.up.railway.app/auth/slack/callback"
     return RedirectResponse(url=url)
 
 @app.get("/auth/slack/callback")
@@ -333,7 +333,7 @@ async def slack_auth_callback(code: str, state: str):
                 "client_id": SLACK_CLIENT_ID,
                 "client_secret": SLACK_CLIENT_SECRET,
                 "code": code,
-                "redirect_uri": "https://workmind-ai-production.up.railway.app/auth/slack/callback"
+                "redirect_uri": "https://workmind-ai-production-8ca2.up.railway.app/auth/slack/callback"
             }
         )
         data = response.json()
@@ -351,7 +351,7 @@ async def slack_auth_callback(code: str, state: str):
 
 @app.get("/auth/jira")
 def jira_auth(user_email: str):
-    url = f"https://auth.atlassian.com/authorize?audience=api.atlassian.com&client_id={JIRA_CLIENT_ID}&scope=read:jira-work%20read:jira-user%20offline_access&redirect_uri=https://workmind-ai-production.up.railway.app/auth/jira/callback&state={user_email}&response_type=code&prompt=consent"
+    url = f"https://auth.atlassian.com/authorize?audience=api.atlassian.com&client_id={JIRA_CLIENT_ID}&scope=read:jira-work%20read:jira-user%20offline_access&redirect_uri=https://workmind-ai-production-8ca2.up.railway.app/auth/jira/callback&state={user_email}&response_type=code&prompt=consent"
     return RedirectResponse(url=url)
 
 @app.get("/auth/jira/callback")
@@ -364,7 +364,7 @@ async def jira_auth_callback(code: str, state: str):
                 "client_id": JIRA_CLIENT_ID,
                 "client_secret": JIRA_CLIENT_SECRET,
                 "code": code,
-                "redirect_uri": "https://workmind-ai-production.up.railway.app/auth/jira/callback"
+                "redirect_uri": "https://workmind-ai-production-8ca2.up.railway.app/auth/jira/callback"
             }
         )
         token_data = token_response.json()
